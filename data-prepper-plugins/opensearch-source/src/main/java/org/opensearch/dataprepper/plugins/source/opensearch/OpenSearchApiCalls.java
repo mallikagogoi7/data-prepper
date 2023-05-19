@@ -35,6 +35,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Reference for Open Search Api calls
+ */
 public class OpenSearchApiCalls implements SearchAPICalls {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenSearchApiCalls.class);

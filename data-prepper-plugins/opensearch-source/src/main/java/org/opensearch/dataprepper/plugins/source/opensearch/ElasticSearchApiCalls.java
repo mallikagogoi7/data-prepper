@@ -6,15 +6,17 @@
 package org.opensearch.dataprepper.plugins.source.opensearch;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.Time;
-import co.elastic.clients.elasticsearch.core.*;
+
+import co.elastic.clients.elasticsearch.core.OpenPointInTimeRequest;
+import co.elastic.clients.elasticsearch.core.OpenPointInTimeResponse;
+import co.elastic.clients.elasticsearch.core.SearchRequest;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.http.HttpStatus;
 import org.json.simple.JSONObject;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
@@ -27,6 +29,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+
+/**
+ * Reference to ElasticSearch Api calls for Higher and Lower Versions
+ */
 
 public class ElasticSearchApiCalls implements SearchAPICalls {
     private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchApiCalls.class);
@@ -100,24 +106,6 @@ public class ElasticSearchApiCalls implements SearchAPICalls {
         }
         try {
             response = elasticsearchClient.search(searchRequest, JSONObject.class);
-        } catch (ElasticsearchException ese) {
-            if (HttpStatus.SC_GATEWAY_TIMEOUT == ese.status() || HttpStatus.SC_INTERNAL_SERVER_ERROR == ese.status()) {
-                BackoffService backoff = new BackoffService(openSearchSourceConfiguration.getMaxRetries());
-                backoff.waitUntilNextTry();
-                while (backoff.shouldRetry()) {
-                    try {
-                        response = elasticsearchClient.search(searchRequest, JSONObject.class);
-                    } catch (IOException ex) {
-                        LOG.error(ex.getMessage());
-                    }
-                    if (HttpStatus.SC_GATEWAY_TIMEOUT != ese.status() && HttpStatus.SC_INTERNAL_SERVER_ERROR != ese.status()) {
-                        backoff.doNotRetry();
-                        break;
-                    } else {
-                        backoff.errorOccured();
-                    }
-                }
-            }
         }catch(IOException e) {
             LOG.error("Exception occured in getSearchForSort {} ", e.getMessage());
         }

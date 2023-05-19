@@ -15,10 +15,8 @@ import java.util.Arrays;
 public class PrepareConnectionTest {
 
     OpenSearchSourceConfiguration openSearchSourceConfiguration = new OpenSearchSourceConfiguration();
-    ;
-    PrepareConnection prepareConnection = new PrepareConnection();
-    ;
 
+    PrepareConnection prepareConnection = new PrepareConnection();
 
     @BeforeEach
     void intialSetup() {

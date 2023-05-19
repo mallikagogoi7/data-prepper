@@ -28,10 +28,17 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
+/**
+ * Reference to Connection Info of OpenSearch, along with health check
+ */
 public class SourceInfoProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(SourceInfoProvider.class);
@@ -170,7 +177,7 @@ public class SourceInfoProvider {
         final Duration rate = objectMapper.convertValue(openSearchSourceConfiguration.getSchedulingParameterConfiguration().getRate(), Duration.class);
         if ((sourceInfo.getDataSource().equalsIgnoreCase(OPEN_SEARCH))
                 && (osVersionIntegerValue >= VERSION_1_3_0)) {
-            new Timer().scheduleAtFixedRate(new OpenSearchPITTask(openSearchSourceConfiguration,buffer,client),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getEpochSecond() , rate.toMillis());
+            new Timer().scheduleAtFixedRate(new OpenSearchPITTask(openSearchSourceConfiguration,buffer,client),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond() , rate.toMillis());
         } else if (sourceInfo.getDataSource().equalsIgnoreCase(OPEN_SEARCH) && (osVersionIntegerValue < VERSION_1_3_0)) {
 
         }
@@ -184,14 +191,14 @@ public class SourceInfoProvider {
                 && (osVersionIntegerValue >= VERSION_7_10_0)) {
             if( BATCH_SIZE_VALUE < openSearchSourceConfiguration.getSearchConfiguration().getBatchSize()) {
                 if(!openSearchSourceConfiguration.getSearchConfiguration().getSorting().isEmpty()) {
-                    new Timer().scheduleAtFixedRate(new ElasticSearchPITPaginationTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getEpochSecond() , rate.toMillis());
+                    new Timer().scheduleAtFixedRate(new ElasticSearchPITPaginationTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond() , rate.toMillis());
                 }
                 else{
                     LOG.info("Sort must contain at least one field");
                 }
             }
             else {
-                new Timer().scheduleAtFixedRate(new ElasticSearchPITTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getEpochSecond() , rate.toMillis());
+                new Timer().scheduleAtFixedRate(new ElasticSearchPITTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond() , rate.toMillis());
             }
 
         } else if (sourceInfo.getDataSource().equalsIgnoreCase(ELASTIC_SEARCH) && (osVersionIntegerValue < VERSION_7_10_0)) {

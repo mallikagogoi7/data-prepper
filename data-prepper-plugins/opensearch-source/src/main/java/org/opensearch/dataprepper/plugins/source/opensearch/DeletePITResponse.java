@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- *
+ * Reference DeletePITResponse Object class
  */
 public class DeletePITResponse implements Serializable {
 

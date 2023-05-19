@@ -14,6 +14,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.TimerTask;
 
+/**
+ * Reference to Schedular for ElasticSearch without Pagination
+ */
 public class ElasticSearchPITTask extends TimerTask {
     
     private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchPITTask.class);

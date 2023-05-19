@@ -15,6 +15,9 @@ import org.opensearch.dataprepper.plugins.source.opensearch.configuration.Search
 
 import java.util.List;
 
+/**
+ * Reference for Open Search Configuration
+ */
 public class OpenSearchSourceConfiguration {
 
     @JsonProperty("max_retries")

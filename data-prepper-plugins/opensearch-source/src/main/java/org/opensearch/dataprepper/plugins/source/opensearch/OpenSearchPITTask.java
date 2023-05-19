@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.TimerTask;
 
+/**
+ * Reference to Schedular for Open Search
+ */
 public class OpenSearchPITTask extends TimerTask {
     private static final Logger LOG = LoggerFactory.getLogger(OpenSearchPITTask.class);
     OpenSearchSourceConfiguration openSearchSourceConfiguration = null;

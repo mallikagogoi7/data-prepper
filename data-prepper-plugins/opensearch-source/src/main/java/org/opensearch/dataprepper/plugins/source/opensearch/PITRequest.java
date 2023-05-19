@@ -33,7 +33,7 @@ public class PITRequest implements JsonpSerializable {
 
     public Map<String,String> queryParameters = new HashMap<>();
 
-    final static JsonpDeserializer<Map> deserializer = new JacksonValueParser<>(Map.class);
+    public static final JsonpDeserializer<Map> deserializer = new JacksonValueParser<>(Map.class);
 
     public void setQueryParameters(Map<String, String> queryParameters) {
         this.queryParameters = queryParameters;

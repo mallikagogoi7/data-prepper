@@ -15,6 +15,9 @@ import org.opensearch.dataprepper.model.source.Source;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Reference to Source class for OpenSearch
+ */
 @DataPrepperPlugin(name="opensearch", pluginType = Source.class , pluginConfigurationType =OpenSearchSourceConfiguration.class )
 public class OpenSearchSource implements Source<Record<Event>> {
 

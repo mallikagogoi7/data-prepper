@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.util.TimerTask;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * Reference to Schedular for ElasticSearch with Pagination
+ */
 public class ElasticSearchPITPaginationTask extends TimerTask {
     
     private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchPITPaginationTask.class);
