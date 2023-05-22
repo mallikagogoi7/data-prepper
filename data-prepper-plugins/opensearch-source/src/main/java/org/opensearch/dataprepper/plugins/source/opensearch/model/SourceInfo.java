@@ -13,6 +13,10 @@ public class SourceInfo {
 
     private Boolean healthStatus = true;
 
+    public SourceInfo(String dataSource) {
+        this.dataSource = dataSource;
+    }
+
     public String getOsVersion() {
         return osVersion;
     }

@@ -85,12 +85,12 @@ public class OpenSearchService implements IndexService {
     private CloseableHttpResponse pitCloseableResponse = null;
 
     @Override
-    public void generatePitId(final OpenSearchSourceConfiguration openSearchSourceConfiguration , Buffer<Record<Event>> buffer) throws IOException {
+    public void generatePitId(final OpenSearchSourceConfiguration openSearchSourceConfiguration , Buffer<Record<Event>> buffer,
+                              List<IndicesRecord> indicesList) throws IOException {
         try {
             String pitId = null;
             pitRequest = new PITRequest(new PITBuilder());
-            int countIndices = dataSourceService.getCatIndicesOpenSearch(openSearchSourceConfiguration, client).size();
-            List<IndicesRecord> indicesList = dataSourceService.getCatIndicesOpenSearch(openSearchSourceConfiguration, client);
+            int countIndices = indicesList.size();
             for (int count = 0; count < countIndices; count++) {
                 pitRequest.setIndex(new StringBuilder(indicesList.get(count).index()));
                 Map<String, String> params = new HashMap<>();
@@ -115,7 +115,7 @@ public class OpenSearchService implements IndexService {
                     }
                 }
             }
-        } catch (IOException | ParseException | NoSuchFieldException | IllegalAccessException e) {
+        } catch (IOException | NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
@@ -167,7 +167,7 @@ public class OpenSearchService implements IndexService {
                 }
             }
         } catch (Exception e){
-           LOG.error("Error occured while running search pit indexes {}",e.getMessage());
+            LOG.error("Error occured while running search pit indexes {}",e.getMessage());
         }
     }
 
@@ -202,11 +202,11 @@ public class OpenSearchService implements IndexService {
 
         JSONArray sortObj = new JSONArray();
         for (int sortIndex = 0 ; sortIndex < openSearchSourceConfiguration.getSearchConfiguration().getSorting().size() ; sortIndex++) {
-                String sortKey = openSearchSourceConfiguration.getSearchConfiguration().getSorting().get(sortIndex).getSortKey();
-                String sortOrder = openSearchSourceConfiguration.getSearchConfiguration().getSorting().get(sortIndex).getOrder();
-                JSONObject sortInnerObj = new JSONObject();
-                sortInnerObj.put(sortKey.trim(),sortOrder);
-                sortObj.add(sortInnerObj);
+            String sortKey = openSearchSourceConfiguration.getSearchConfiguration().getSorting().get(sortIndex).getSortKey();
+            String sortOrder = openSearchSourceConfiguration.getSearchConfiguration().getSorting().get(sortIndex).getOrder();
+            JSONObject sortInnerObj = new JSONObject();
+            sortInnerObj.put(sortKey.trim(),sortOrder);
+            sortObj.add(sortInnerObj);
         }
         pitSearchRequestObj.put("sort",sortObj);
 
@@ -265,14 +265,14 @@ public class OpenSearchService implements IndexService {
             BackoffService backoff = new BackoffService(openSearchSourceConfiguration.getMaxRetries());
             backoff.waitUntilNextTry();
             while (backoff.shouldRetry()) {
-               pitCloseableResponse = httpClient.execute(httpGet);
-               if (HttpStatus.SC_GATEWAY_TIMEOUT != pitCloseableResponse.getCode() && HttpStatus.SC_INTERNAL_SERVER_ERROR != pitCloseableResponse.getCode()) {
-                  backoff.doNotRetry();
-                  break;
-               } else {
+                pitCloseableResponse = httpClient.execute(httpGet);
+                if (HttpStatus.SC_GATEWAY_TIMEOUT != pitCloseableResponse.getCode() && HttpStatus.SC_INTERNAL_SERVER_ERROR != pitCloseableResponse.getCode()) {
+                    backoff.doNotRetry();
+                    break;
+                } else {
                     LOG.info(" Retrying after {}");
                     backoff.errorOccured();
-               }
+                }
             }
             return null;
         } else {

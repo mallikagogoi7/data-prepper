@@ -6,6 +6,7 @@ package org.opensearch.dataprepper.plugins.source.opensearch.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
+import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.AwsAuthenticationConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.ConnectionConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.IndexParametersConfiguration;
@@ -50,6 +51,12 @@ public class OpenSearchSourceConfiguration {
 
     @JsonProperty("search_options")
     private SearchConfiguration searchConfiguration;
+
+    private List<IndicesRecord> indicesList;
+
+    public List<IndicesRecord> getIndicesList() { return indicesList;  }
+
+    public void setIndicesList(List<IndicesRecord> indicesList) {  this.indicesList = indicesList;  }
 
     public Integer getMaxRetries() {
         return maxRetries;
