@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.utils;
 
+
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;

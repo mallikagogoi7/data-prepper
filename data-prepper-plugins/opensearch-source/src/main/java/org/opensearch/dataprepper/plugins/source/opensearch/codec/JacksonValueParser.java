@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.json.stream.JsonParser;
@@ -21,7 +21,7 @@ public class JacksonValueParser<T> extends JsonpDeserializerBase<T> {
     private static final Logger LOG = LoggerFactory.getLogger(JacksonValueParser.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Class<T> clazz;
-    protected JacksonValueParser(Class<T> clazz) {
+    public JacksonValueParser(Class<T> clazz) {
         super(EnumSet.allOf(JsonParser.Event.class));
         this.clazz = clazz;
     }

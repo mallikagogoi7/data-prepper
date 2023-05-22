@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +24,8 @@ import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
@@ -38,9 +40,9 @@ import java.util.Map;
 /**
  * Reference for Open Search Api calls
  */
-public class OpenSearchApiCalls implements SearchAPICalls {
+public class OpenSearchService implements IndexService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OpenSearchApiCalls.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OpenSearchService.class);
 
     public static final int SUCCESS_CODE = 200;
 
@@ -60,7 +62,7 @@ public class OpenSearchApiCalls implements SearchAPICalls {
 
     private OpenSearchClient client ;
 
-    private SourceInfoProvider sourceInfoProvider = new SourceInfoProvider();
+    private DataSourceService dataSourceService = new DataSourceService();
 
     private int currentBatchSize = 0;
 
@@ -68,7 +70,7 @@ public class OpenSearchApiCalls implements SearchAPICalls {
 
     private StringBuffer stringEntity ;
 
-    public OpenSearchApiCalls(OpenSearchClient openSearchClient)
+    public OpenSearchService(OpenSearchClient openSearchClient)
     {
         this.client = openSearchClient;
 
@@ -87,8 +89,8 @@ public class OpenSearchApiCalls implements SearchAPICalls {
         try {
             String pitId = null;
             pitRequest = new PITRequest(new PITBuilder());
-            int countIndices = sourceInfoProvider.getCatIndicesOpenSearch(openSearchSourceConfiguration, client).size();
-            List<IndicesRecord> indicesList = sourceInfoProvider.getCatIndicesOpenSearch(openSearchSourceConfiguration, client);
+            int countIndices = dataSourceService.getCatIndicesOpenSearch(openSearchSourceConfiguration, client).size();
+            List<IndicesRecord> indicesList = dataSourceService.getCatIndicesOpenSearch(openSearchSourceConfiguration, client);
             for (int count = 0; count < countIndices; count++) {
                 pitRequest.setIndex(new StringBuilder(indicesList.get(count).index()));
                 Map<String, String> params = new HashMap<>();
@@ -146,7 +148,7 @@ public class OpenSearchApiCalls implements SearchAPICalls {
                 StringEntity stringEntity = new StringEntity(pitSearchRequestObj.toString());
                 httpGet.setEntity(stringEntity);
                 StringBuffer result = getSearchResponse(httpClient,httpGet,openSearchSourceConfiguration);
-                sourceInfoProvider.writeClusterDataToBuffer(result.toString(), buffer);
+                dataSourceService.writeClusterDataToBuffer(result.toString(), buffer);
 
             } else {
                 List<Integer> searchAfter = null;
@@ -160,18 +162,13 @@ public class OpenSearchApiCalls implements SearchAPICalls {
                         lastHit = hit.get(hit.size() - 1);
                     searchAfter = lastHit.getSort();
                     LOG.info(searchAfter.toString());
-                    sourceInfoProvider.writeClusterDataToBuffer(stringEntity.toString(), buffer);
+                    dataSourceService.writeClusterDataToBuffer(stringEntity.toString(), buffer);
                     currentBatchSize = currentBatchSize - sizeForPagination;
                 }
             }
         } catch (Exception e){
            LOG.error("Error occured while running search pit indexes {}",e.getMessage());
         }
-    }
-
-    @Override
-    public void getScrollResponse(final OpenSearchSourceConfiguration openSearchSourceConfiguration ,Buffer<Record<Event>> buffer) {
-        LOG.info("Available in next PR");
     }
 
     private void deletePitId(final String pitId , final OpenSearchSourceConfiguration openSearchSourceConfiguration) throws IOException, NoSuchFieldException, IllegalAccessException {

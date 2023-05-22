@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.service;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +20,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.model.SourceInfo;
+import org.opensearch.dataprepper.plugins.source.opensearch.scheduler.ElasticSearchPITPaginationTask;
+import org.opensearch.dataprepper.plugins.source.opensearch.scheduler.ElasticSearchPITTask;
+import org.opensearch.dataprepper.plugins.source.opensearch.scheduler.OpenSearchPITTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
@@ -39,9 +44,9 @@ import java.util.ArrayList;
 /**
  * Reference to Connection Info of OpenSearch, along with health check
  */
-public class SourceInfoProvider {
+public class DataSourceService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SourceInfoProvider.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DataSourceService.class);
 
     private String datasource;
 

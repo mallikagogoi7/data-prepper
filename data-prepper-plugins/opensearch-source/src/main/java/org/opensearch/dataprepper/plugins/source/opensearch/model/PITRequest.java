@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.model;
 
 import jakarta.json.stream.JsonGenerator;
 import org.opensearch.client.json.JsonpDeserializer;
@@ -12,6 +12,7 @@ import org.opensearch.client.json.JsonpSerializable;
 import org.opensearch.client.opensearch._types.ErrorResponse;
 import org.opensearch.client.transport.Endpoint;
 import org.opensearch.client.transport.endpoints.SimpleEndpoint;
+import org.opensearch.dataprepper.plugins.source.opensearch.codec.JacksonValueParser;
 
 import java.util.HashMap;
 import java.util.Map;

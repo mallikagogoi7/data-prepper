@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -13,43 +13,54 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "value",
-    "relation"
+    "total",
+    "max_score",
+    "hits"
 })
+public class Hits {
 
-public class Total {
-
-    @JsonProperty("value")
-    private Integer value;
-
-    @JsonProperty("relation")
-    private String relation;
-
+    @JsonProperty("total")
+    private Total total;
+    @JsonProperty("max_score")
+    private Object maxScore;
+    @JsonProperty("hits")
+    private List<Hit> hits;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
-    @JsonProperty("value")
-    public Integer getValue() {
-        return value;
+    @JsonProperty("total")
+    public Total getTotal() {
+        return total;
     }
 
-    @JsonProperty("value")
-    public void setValue(Integer value) {
-        this.value = value;
+    @JsonProperty("total")
+    public void setTotal(Total total) {
+        this.total = total;
     }
 
-    @JsonProperty("relation")
-    public String getRelation() {
-        return relation;
+    @JsonProperty("max_score")
+    public Object getMaxScore() {
+        return maxScore;
     }
 
-    @JsonProperty("relation")
-    public void setRelation(String relation) {
-        this.relation = relation;
+    @JsonProperty("max_score")
+    public void setMaxScore(Object maxScore) {
+        this.maxScore = maxScore;
+    }
+
+    @JsonProperty("hits")
+    public List<Hit> getHits() {
+        return hits;
+    }
+
+    @JsonProperty("hits")
+    public void setHits(List<Hit> hits) {
+        this.hits = hits;
     }
 
     @JsonAnyGetter

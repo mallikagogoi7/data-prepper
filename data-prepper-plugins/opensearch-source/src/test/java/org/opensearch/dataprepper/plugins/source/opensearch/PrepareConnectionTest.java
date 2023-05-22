@@ -7,6 +7,8 @@ package org.opensearch.dataprepper.plugins.source.opensearch;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.connection.PrepareConnection;
 
 import java.net.MalformedURLException;
 import java.util.Arrays;
@@ -16,7 +18,9 @@ public class PrepareConnectionTest {
 
     OpenSearchSourceConfiguration openSearchSourceConfiguration = new OpenSearchSourceConfiguration();
 
+
     PrepareConnection prepareConnection = new PrepareConnection();
+
 
     @BeforeEach
     void intialSetup() {

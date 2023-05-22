@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -13,54 +13,71 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "total",
-    "max_score",
-    "hits"
+    "successful",
+    "skipped",
+    "failed"
 })
-public class Hits {
+
+public class Shards {
 
     @JsonProperty("total")
-    private Total total;
-    @JsonProperty("max_score")
-    private Object maxScore;
-    @JsonProperty("hits")
-    private List<Hit> hits;
+    private Integer total;
+
+    @JsonProperty("successful")
+    private Integer successful;
+
+    @JsonProperty("skipped")
+    private Integer skipped;
+
+    @JsonProperty("failed")
+    private Integer failed;
+
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     @JsonProperty("total")
-    public Total getTotal() {
+    public Integer getTotal() {
         return total;
     }
 
     @JsonProperty("total")
-    public void setTotal(Total total) {
+    public void setTotal(Integer total) {
         this.total = total;
     }
 
-    @JsonProperty("max_score")
-    public Object getMaxScore() {
-        return maxScore;
+    @JsonProperty("successful")
+    public Integer getSuccessful() {
+        return successful;
     }
 
-    @JsonProperty("max_score")
-    public void setMaxScore(Object maxScore) {
-        this.maxScore = maxScore;
+    @JsonProperty("successful")
+    public void setSuccessful(Integer successful) {
+        this.successful = successful;
     }
 
-    @JsonProperty("hits")
-    public List<Hit> getHits() {
-        return hits;
+    @JsonProperty("skipped")
+    public Integer getSkipped() {
+        return skipped;
     }
 
-    @JsonProperty("hits")
-    public void setHits(List<Hit> hits) {
-        this.hits = hits;
+    @JsonProperty("skipped")
+    public void setSkipped(Integer skipped) {
+        this.skipped = skipped;
+    }
+
+    @JsonProperty("failed")
+    public Integer getFailed() {
+        return failed;
+    }
+
+    @JsonProperty("failed")
+    public void setFailed(Integer failed) {
+        this.failed = failed;
     }
 
     @JsonAnyGetter

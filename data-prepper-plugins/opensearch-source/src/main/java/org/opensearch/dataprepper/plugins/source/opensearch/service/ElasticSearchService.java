@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.opensearch;
+package org.opensearch.dataprepper.plugins.source.opensearch.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOptions;
@@ -21,6 +21,8 @@ import org.json.simple.JSONObject;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.utils.Utility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +36,8 @@ import java.util.stream.Collectors;
  * Reference to ElasticSearch Api calls for Higher and Lower Versions
  */
 
-public class ElasticSearchApiCalls implements SearchAPICalls {
-    private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchApiCalls.class);
+public class ElasticSearchService implements IndexService {
+    private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchService.class);
 
     private static final String KEEP_ALIVE_VALUE = "24h";
 
@@ -47,9 +49,9 @@ public class ElasticSearchApiCalls implements SearchAPICalls {
 
     private ElasticsearchClient elasticsearchClient;
 
-    private SourceInfoProvider sourceInfoProvider = new SourceInfoProvider();
+    private DataSourceService dataSourceService = new DataSourceService();
 
-    public ElasticSearchApiCalls(ElasticsearchClient elasticsearchClient) {
+    public ElasticSearchService(ElasticsearchClient elasticsearchClient) {
         this.elasticsearchClient = elasticsearchClient;
     }
 
@@ -75,15 +77,10 @@ public class ElasticSearchApiCalls implements SearchAPICalls {
                     ObjectNode.class);
             searchResponse.hits().hits().stream()
                     .map(Hit::source).collect(Collectors.toList());
-            sourceInfoProvider.writeClusterDataToBuffer(searchResponse.fields().toString(),buffer);
+            dataSourceService.writeClusterDataToBuffer(searchResponse.fields().toString(),buffer);
         } catch (Exception ex) {
             LOG.error(ex.getMessage());
         }
-    }
-
-    @Override
-    public void getScrollResponse(final OpenSearchSourceConfiguration openSearchSourceConfiguration,Buffer<Record<Event>> buffer) {
-      LOG.info("Available in next PR");
     }
 
     private SearchResponse getSearchForSort(final OpenSearchSourceConfiguration openSearchSourceConfiguration, long searchAfter, List<SortOptions> sortOptionsList ) {
@@ -148,7 +145,7 @@ public class ElasticSearchApiCalls implements SearchAPICalls {
                 LOG.error("Exception occured in extractSortValue {} ", e.getMessage());
             }
         }
-        sourceInfoProvider.writeClusterDataToBuffer(response.fields().toString(),buffer);
+        dataSourceService.writeClusterDataToBuffer(response.fields().toString(),buffer);
         return sortValue;
     }
 }

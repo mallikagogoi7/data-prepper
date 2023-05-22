@@ -12,13 +12,18 @@ import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.source.Source;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.connection.PrepareConnection;
+import org.opensearch.dataprepper.plugins.source.opensearch.service.BackoffService;
+import org.opensearch.dataprepper.plugins.source.opensearch.model.SourceInfo;
+import org.opensearch.dataprepper.plugins.source.opensearch.service.DataSourceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Reference to Source class for OpenSearch
  */
-@DataPrepperPlugin(name="opensearch", pluginType = Source.class , pluginConfigurationType =OpenSearchSourceConfiguration.class )
+@DataPrepperPlugin(name="opensearch", pluginType = Source.class , pluginConfigurationType = OpenSearchSourceConfiguration.class )
 public class OpenSearchSource implements Source<Record<Event>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenSearchSource.class);
@@ -51,27 +56,27 @@ public class OpenSearchSource implements Source<Record<Event>> {
 
         try {
             SourceInfo sourceInfo = new SourceInfo();
-            SourceInfoProvider sourceInfoProvider = new SourceInfoProvider();
-            String datasource = sourceInfoProvider.getSourceInfo(openSearchSourceConfiguration);
+            DataSourceService dataSourceService = new DataSourceService();
+            String datasource = dataSourceService.getSourceInfo(openSearchSourceConfiguration);
             sourceInfo.setDataSource(datasource);
             LOG.info("Datasource is : {} ", sourceInfo.getDataSource());
-            sourceInfo = sourceInfoProvider.checkStatus(openSearchSourceConfiguration, sourceInfo);
+            sourceInfo = dataSourceService.checkStatus(openSearchSourceConfiguration, sourceInfo);
             if (Boolean.TRUE.equals(sourceInfo.getHealthStatus())) {
                 if (OPEN_SEARCH.equalsIgnoreCase(datasource)) {
                     openSearchClient = prepareConnection.prepareOpensearchConnection(openSearchSourceConfiguration);
-                    sourceInfoProvider.getCatOpenSearchIndices(openSearchSourceConfiguration, openSearchClient);
-                    sourceInfoProvider.versionCheckForOpenSearch(openSearchSourceConfiguration, sourceInfo, openSearchClient,buffer);
+                    dataSourceService.getCatOpenSearchIndices(openSearchSourceConfiguration, openSearchClient);
+                    dataSourceService.versionCheckForOpenSearch(openSearchSourceConfiguration, sourceInfo, openSearchClient,buffer);
                 } else {
                     elasticsearchClient = prepareConnection.prepareElasticSearchConnection(openSearchSourceConfiguration);
-                    sourceInfoProvider.getCatElasticIndices(openSearchSourceConfiguration,elasticsearchClient);
-                    sourceInfoProvider.versionCheckForElasticSearch(openSearchSourceConfiguration, sourceInfo, elasticsearchClient,buffer);
+                    dataSourceService.getCatElasticIndices(openSearchSourceConfiguration,elasticsearchClient);
+                    dataSourceService.versionCheckForElasticSearch(openSearchSourceConfiguration, sourceInfo, elasticsearchClient,buffer);
                 }
 
             } else {
                 BackoffService backoff = new BackoffService(openSearchSourceConfiguration.getMaxRetries());
                 backoff.waitUntilNextTry();
                 while (backoff.shouldRetry()) {
-                    sourceInfo = sourceInfoProvider.checkStatus(openSearchSourceConfiguration,sourceInfo);
+                    sourceInfo = dataSourceService.checkStatus(openSearchSourceConfiguration,sourceInfo);
                     if (Boolean.TRUE.equals(sourceInfo.getHealthStatus())) {
                         backoff.doNotRetry();
                         break;
