@@ -6,6 +6,7 @@
 package org.opensearch.dataprepper.plugins.source.opensearch.scheduler;
 
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
@@ -15,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TimerTask;
 
 /**
@@ -29,10 +32,11 @@ public class OpenSearchPITTask extends TimerTask {
 
     OpenSearchService openSearchService = null;
 
-
-    public OpenSearchPITTask(OpenSearchSourceConfiguration openSearchSourceConfiguration , Buffer<Record<Event>> buffer , OpenSearchClient osClient ) {
+    List<IndicesRecord> indicesList = new ArrayList<>();
+    public OpenSearchPITTask(OpenSearchSourceConfiguration openSearchSourceConfiguration , Buffer<Record<Event>> buffer , OpenSearchClient osClient , List<IndicesRecord> indicesList) {
         this.openSearchSourceConfiguration = openSearchSourceConfiguration;
         this.buffer = buffer;
+        this.indicesList = indicesList;
         openSearchService = new OpenSearchService(osClient);
     }
 
@@ -41,7 +45,7 @@ public class OpenSearchPITTask extends TimerTask {
         int numRuns = 0;
         while (numRuns++ <= openSearchSourceConfiguration.getSchedulingParameterConfiguration().getJobCount()) {
             try {
-                   openSearchService.generatePitId(openSearchSourceConfiguration , buffer);
+                   openSearchService.generatePitId(openSearchSourceConfiguration , buffer, indicesList);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

@@ -152,30 +152,6 @@ public class DataSourceService {
         return datasource;
     }
 
-    /**
-     * @param openSearchSourceConfiguration
-    // * @param sourceInfo
-     * @return
-     * @throws IOException
-     * @throws ParseException This method will check health of the source, if green or yellow, and then it can be used for further processing
-     */
-    /*public SourceInfo checkStatus(final OpenSearchSourceConfiguration openSearchSourceConfiguration, final SourceInfo sourceInfo) throws IOException, ParseException {
-        String osVersion = null;
-        JSONObject jsonObject = callToHealthCheck(openSearchSourceConfiguration);
-        String status;
-        status = (String) jsonObject.get(CLUSTER_HEALTH_STATUS);
-        if (status.equalsIgnoreCase(CLUSTER_HEALTH_STATUS_RED))
-            sourceInfo.setHealthStatus(false);
-        Map<String, String> nodesMap = ((Map) jsonObject.get(NODES));
-        for (Map.Entry<String, String> entry : nodesMap.entrySet()) {
-            if (entry.getKey().equals(VERSIONS)) {
-                osVersion = String.valueOf(entry.getValue());
-                sourceInfo.setOsVersion(osVersion);
-            }
-        }
-        return sourceInfo;
-    }*/
-
     public JSONObject callToHealthCheck(final OpenSearchSourceConfiguration openSearchSourceConfiguration) throws IOException, ParseException {
         URL obj = new URL(openSearchSourceConfiguration.getHosts().get(0) + CLUSTER_STATS_ENDPOINTS);
         HttpURLConnection con = (HttpURLConnection) obj.openConnection();
@@ -201,25 +177,27 @@ public class DataSourceService {
     }
 
     public void versionCheck(final OpenSearchSourceConfiguration openSearchSourceConfiguration, final SourceInfo sourceInfo
-            , Buffer<Record<Event>> buffer)  {
+            , Buffer<Record<Event>> buffer, List<IndicesRecord> indicesList)  {
         int osVersionIntegerValue = Integer.parseInt(sourceInfo.getOsVersion().replaceAll(REGULAR_EXPRESSION, ""));
         if (sourceInfo.getDataSource().equalsIgnoreCase(OPEN_SEARCH)) {
             if (osVersionIntegerValue >= VERSION_1_3_0) {
-                new Timer().scheduleAtFixedRate(new OpenSearchPITTask(openSearchSourceConfiguration, buffer, openSearchClient), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), rate.toMillis());
+                new Timer().scheduleAtFixedRate(new OpenSearchPITTask(openSearchSourceConfiguration, buffer, openSearchClient, indicesList), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getRate().toMillis());
             } else {
 
             }
 
         } else {
             if (osVersionIntegerValue >= VERSION_7_10_0) {
-                if (BATCH_SIZE_VALUE < openSearchSourceConfiguration.getSearchConfiguration().getBatchSize()) {
+                if (BATCH_SIZE_VALUE <= openSearchSourceConfiguration.getSearchConfiguration().getBatchSize()) {
+                    LOG.info(" %%%%%%%%%%%%%%% batch size:" + openSearchSourceConfiguration.getSearchConfiguration().getBatchSize());
                     if (!openSearchSourceConfiguration.getSearchConfiguration().getSorting().isEmpty()) {
-                        new Timer().scheduleAtFixedRate(new ElasticSearchPITPaginationTask(openSearchSourceConfiguration, buffer, elasticsearchClient), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), rate.toMillis());
+                      LOG.info(" %%%%%%%    inside if condition %%%%%%% ");
+                        new Timer().scheduleAtFixedRate(new ElasticSearchPITPaginationTask(openSearchSourceConfiguration, buffer, elasticsearchClient), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getRate().toMillis());
                     } else {
                         LOG.info("Sort must contain at least one field");
                     }
                 } else {
-                    new Timer().scheduleAtFixedRate(new ElasticSearchPITTask(openSearchSourceConfiguration, buffer, elasticsearchClient), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), rate.toMillis());
+                    new Timer().scheduleAtFixedRate(new ElasticSearchPITTask(openSearchSourceConfiguration, buffer, elasticsearchClient), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond(), openSearchSourceConfiguration.getSchedulingParameterConfiguration().getRate().toMillis());
                 }
             } else {
 
@@ -227,28 +205,6 @@ public class DataSourceService {
         }
 
     }
-/*    public void versionCheckForElasticSearch(final OpenSearchSourceConfiguration openSearchSourceConfiguration,
-                                             final SourceInfo sourceInfo, final ElasticsearchClient esClient ,Buffer<Record<Event>> buffer)  throws TimeoutException, IOException {
-        int osVersionIntegerValue = Integer.parseInt(sourceInfo.getOsVersion().replaceAll(REGULAR_EXPRESSION, ""));
-        objectMapper.registerModule(new JavaTimeModule());
-        final Duration rate = objectMapper.convertValue(openSearchSourceConfiguration.getSchedulingParameterConfiguration().getRate(), Duration.class);
-        if ((sourceInfo.getDataSource().equalsIgnoreCase(ELASTIC_SEARCH))
-                && (osVersionIntegerValue >= VERSION_7_10_0)) {
-            if( BATCH_SIZE_VALUE < openSearchSourceConfiguration.getSearchConfiguration().getBatchSize()) {
-                if(!openSearchSourceConfiguration.getSearchConfiguration().getSorting().isEmpty()) {
-                    new Timer().scheduleAtFixedRate(new ElasticSearchPITPaginationTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond() , rate.toMillis());
-                }
-                else{
-                    LOG.info("Sort must contain at least one field");
-                }
-            }
-            else {
-                new Timer().scheduleAtFixedRate(new ElasticSearchPITTask(openSearchSourceConfiguration,buffer,esClient),openSearchSourceConfiguration.getSchedulingParameterConfiguration().getStartTime().getSecond() , rate.toMillis());
-            }
-
-        } else if (sourceInfo.getDataSource().equalsIgnoreCase(ELASTIC_SEARCH) && (osVersionIntegerValue < VERSION_7_10_0)) {
-        }
-    }*/
 
     public void writeClusterDataToBuffer(final String responseBody,final Buffer<Record<Event>> buffer) throws TimeoutException {
         try {
@@ -266,36 +222,12 @@ public class DataSourceService {
         }
     }
 
-   /* public List<IndicesRecord> callCatOpenSearchIndices(final OpenSearchClient client) throws IOException,ParseException {
-        List<IndicesRecord> indexInfoList = client.cat().indices().valueBody();
-        return indexInfoList;
-    }*/
-
     public List<IndicesRecord> callCatElasticIndices(final ElasticsearchClient client) throws IOException,ParseException {
         List<IndicesRecord> indicesRecords=new ArrayList<>();
         client.cat().indices().valueBody().forEach(elasticSearchCatIndex->{
             indicesRecords.add(objectMapper.convertValue(elasticSearchCatIndex,IndicesRecord.class));
         });
         return indicesRecords;
-    }
-/*    public HashMap<String, String> getElasticSearchIndexMap(final List<co.elastic.clients.elasticsearch.cat.indices.IndicesRecord> indexInfos) {
-        HashMap<String,String> indexMap = new HashMap<>();
-        for(co.elastic.clients.elasticsearch.cat.indices.IndicesRecord indexInfo : indexInfos) {
-            String indexName = indexInfo.index();
-            String indexSize = indexInfo.storeSize();
-            indexMap.put(indexName,indexSize);
-        }
-        return indexMap;
-    }*/
-
-    public HashMap<String, String> getOpenSearchIndexMap(final List<IndicesRecord> indexInfos) {
-        HashMap<String,String> indexMap = new HashMap<>();
-        for(IndicesRecord indexInfo : indexInfos) {
-            String indexName = indexInfo.index();
-            String indexSize = indexInfo.storeSize();
-            indexMap.put(indexName,indexSize);
-        }
-        return indexMap;
     }
 
     public  List<IndicesRecord> getOpenSearchIndicesRecords(final OpenSearchSourceConfiguration openSearchSourceConfiguration,
@@ -332,7 +264,7 @@ public class DataSourceService {
         return indicesRecords;
     }
 
-    public void setCatIndices(final OpenSearchSourceConfiguration openSearchSourceConfiguration, final String datasource) throws IOException, ParseException {
+    public List<IndicesRecord> getCatIndices(final OpenSearchSourceConfiguration openSearchSourceConfiguration, final String datasource) throws IOException, ParseException {
         List<IndicesRecord> catIndices = new ArrayList<>();
         if (openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude() == null ||
                 openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude().isEmpty()) {
@@ -352,50 +284,7 @@ public class DataSourceService {
         } else {
             catIndices = getOpenSearchIndicesRecords(openSearchSourceConfiguration, catIndices);
         }
-        openSearchSourceConfiguration.setIndicesList(catIndices);
-      // indexMap = getOpenSearchIndexMap(catIndices);
-
+    return catIndices;
     }
 
-/*
-    public List<co.elastic.clients.elasticsearch.cat.indices.IndicesRecord> getCatElasticIndices(final OpenSearchSourceConfiguration openSearchSourceConfiguration, ElasticsearchClient client) throws IOException, ParseException {
-        List<co.elastic.clients.elasticsearch.cat.indices.IndicesRecord> catIndices = new ArrayList<>();
-        if (openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude() == null ||
-                openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude().isEmpty()) {
-            catIndices = callCatElasticIndices(client);
-
-            if (openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude() != null
-                    && !openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude().isEmpty()) {
-                catIndices = catIndices.stream().filter(c -> !(openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude().contains(c.index()))).
-                        collect(Collectors.toList());
-            }
-        } else {
-            catIndices = getElasticSearchIndicesRecords(openSearchSourceConfiguration, catIndices);
-        }
-
-        indexMap = getElasticSearchIndexMap(catIndices);
-        return catIndices;
-
-    }
-*/
-
-/*    public List<IndicesRecord> getCatIndicesOpenSearch(final OpenSearchSourceConfiguration openSearchSourceConfiguration, OpenSearchClient client) throws IOException, ParseException {
-        List<IndicesRecord> catIndices = new ArrayList<>();
-        if (openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude() == null ||
-                openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude().isEmpty()) {
-            catIndices = callCatOpenSearchIndices(client);
-
-            if (openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude() != null
-                    && !openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude().isEmpty()) {
-                catIndices = catIndices.stream().filter(c -> !(openSearchSourceConfiguration.getIndexParametersConfiguration().getExclude().contains(c.index()))).
-                        collect(Collectors.toList());
-            }
-        } else {
-            catIndices = getOpenSearchIndicesRecords(openSearchSourceConfiguration, catIndices);
-        }
-
-        indexMap = getOpenSearchIndexMap(catIndices);
-        LOG.info("Indexes  are {} :  ", indexMap);
-        return catIndices;
-    }*/
 }

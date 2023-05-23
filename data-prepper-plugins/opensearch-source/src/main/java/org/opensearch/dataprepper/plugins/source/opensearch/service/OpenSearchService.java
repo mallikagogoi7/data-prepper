@@ -25,6 +25,7 @@ import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.connection.PrepareConnection;
 import org.opensearch.dataprepper.plugins.source.opensearch.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,7 @@ public class OpenSearchService implements IndexService {
 
     private OpenSearchClient client ;
 
-    private DataSourceService dataSourceService = new DataSourceService();
+    //private DataSourceService dataSourceService = new DataSourceService();
 
     private int currentBatchSize = 0;
 
@@ -124,6 +125,7 @@ public class OpenSearchService implements IndexService {
     public void searchPitIndexes(final String pitId ,final OpenSearchSourceConfiguration openSearchSourceConfiguration ,Buffer<Record<Event>> buffer) {
         try
         {
+            DataSourceService dataSourceService = new DataSourceService(new PrepareConnection());
             int sizeForPagination = 100;
             CloseableHttpClient httpClient= HttpClients.createDefault();
             HttpGet httpGet=new HttpGet(openSearchSourceConfiguration.getHosts().get(0)+"_search");

@@ -18,10 +18,12 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.json.simple.JSONObject;
+import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
+import org.opensearch.dataprepper.plugins.source.opensearch.connection.PrepareConnection;
 import org.opensearch.dataprepper.plugins.source.opensearch.utils.Utility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,14 +51,14 @@ public class ElasticSearchService implements IndexService {
 
     private ElasticsearchClient elasticsearchClient;
 
-    private DataSourceService dataSourceService = new DataSourceService();
+   // private DataSourceService dataSourceService = new DataSourceService();
 
     public ElasticSearchService(ElasticsearchClient elasticsearchClient) {
         this.elasticsearchClient = elasticsearchClient;
     }
 
     @Override
-    public void generatePitId(final OpenSearchSourceConfiguration openSearchSourceConfiguration, Buffer<Record<Event>> buffer) {
+    public void generatePitId(final OpenSearchSourceConfiguration openSearchSourceConfiguration, Buffer<Record<Event>> buffer, List<IndicesRecord> indicesList) {
         OpenPointInTimeResponse response = null;
         OpenPointInTimeRequest request = new OpenPointInTimeRequest.Builder().
                 index(openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude()).
@@ -71,6 +73,7 @@ public class ElasticSearchService implements IndexService {
     @Override
     public void searchPitIndexes(final String pitID , final OpenSearchSourceConfiguration openSearchSourceConfiguration, Buffer<Record<Event>> buffer) {
         SearchResponse<ObjectNode> searchResponse = null;
+        DataSourceService dataSourceService = new DataSourceService(new PrepareConnection());
         try {
             searchResponse = elasticsearchClient.search(req ->
                             req.index(openSearchSourceConfiguration.getIndexParametersConfiguration().getInclude()),
@@ -135,6 +138,7 @@ public class ElasticSearchService implements IndexService {
     }
 
     private long extractSortValue(SearchResponse response, Buffer<Record<Event>> buffer) throws TimeoutException {
+        DataSourceService dataSourceService = new DataSourceService(new PrepareConnection());
         HitsMetadata hitsMetadata = response.hits();
         int size = hitsMetadata.hits().size();
         long sortValue = 0;

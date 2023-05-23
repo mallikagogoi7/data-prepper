@@ -7,6 +7,7 @@ package org.opensearch.dataprepper.plugins.source.opensearch;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.json.simple.JSONObject;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.Buffer;
@@ -21,6 +22,7 @@ import org.opensearch.dataprepper.plugins.source.opensearch.service.DataSourceSe
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -62,8 +64,8 @@ public class OpenSearchSource implements Source<Record<Event>> {
             sourceInfo.setHealthStatus(healthCheck(healthCheckResponse));
             sourceInfo.setOsVersion(getOSVersion(healthCheckResponse));
             if (Boolean.TRUE.equals(sourceInfo.getHealthStatus())) {
-                dataSourceService.setCatIndices(openSearchSourceConfiguration, sourceInfo.getDataSource());
-                dataSourceService.versionCheck(openSearchSourceConfiguration, sourceInfo, buffer);
+                List<IndicesRecord> indicesRecords = dataSourceService.getCatIndices(openSearchSourceConfiguration, sourceInfo.getDataSource());
+                dataSourceService.versionCheck(openSearchSourceConfiguration, sourceInfo, buffer,indicesRecords);
             } else {
                 BackoffService backoff = new BackoffService(openSearchSourceConfiguration.getMaxRetries());
                 backoff.waitUntilNextTry();

@@ -15,7 +15,7 @@ opensearch-pipeline:
         sts_role_arn: "arn:aws:iam::278936200144:role/aos-role"
       indices:
         include:
-          - "shakespeare"
+          - "customdata"
         exclude:
           - ""
       scheduling:
@@ -23,7 +23,7 @@ opensearch-pipeline:
         job_count: 1
         start_time: 2023-05-15T18:00:00Z
       query:
-        fields: ["play_name : hamlet","speaker : 1"]
+        fields: ["play_name : Henry VI Part 1"]
       search_options:
         batch_size: 1000
         expand_wildcards: "open"
