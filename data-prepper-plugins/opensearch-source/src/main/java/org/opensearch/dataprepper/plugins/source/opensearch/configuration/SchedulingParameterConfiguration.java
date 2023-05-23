@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Min;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+
 public class SchedulingParameterConfiguration {
 
     @JsonProperty("rate")
@@ -23,6 +24,7 @@ public class SchedulingParameterConfiguration {
     @Min(1)
     @JsonProperty("job_count")
     private int jobCount = 1;
+
 
     @JsonSerialize(using = LocalDateTimeSerializer.class)
     @JsonDeserialize(using = LocalDateTimeDeserializer.class)
@@ -37,7 +39,5 @@ public class SchedulingParameterConfiguration {
         return jobCount;
     }
 
-    public LocalDateTime getStartTime() {
-        return startTime;
-    }
+    public LocalDateTime getStartTime() {return startTime;}
 }

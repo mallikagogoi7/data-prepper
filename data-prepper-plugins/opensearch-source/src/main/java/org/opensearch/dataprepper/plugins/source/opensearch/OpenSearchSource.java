@@ -4,16 +4,19 @@
  */
 package org.opensearch.dataprepper.plugins.source.opensearch;
 
+
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.json.simple.JSONObject;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
+
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.source.Source;
+
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.OpenSearchSourceConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.connection.PrepareConnection;
 import org.opensearch.dataprepper.plugins.source.opensearch.service.BackoffService;
@@ -28,10 +31,11 @@ import java.util.Map;
 /**
  * Reference to Source class for OpenSearch
  */
-@DataPrepperPlugin(name = "opensearch", pluginType = Source.class, pluginConfigurationType = OpenSearchSourceConfiguration.class)
-public class OpenSearchSource implements Source<Record<Event>> {
 
+@DataPrepperPlugin(name="opensearch", pluginType = Source.class , pluginConfigurationType =OpenSearchSourceConfiguration.class )
+public class OpenSearchSource implements Source<Record<Event>> {
     private static final Logger LOG = LoggerFactory.getLogger(OpenSearchSource.class);
+
 
     private static final String ELASTIC_SEARCH = "elasticsearch";
 
@@ -108,6 +112,5 @@ public class OpenSearchSource implements Source<Record<Event>> {
 
     @Override
     public void stop() {
-
     }
 }
