@@ -1,0 +1,34 @@
+opensearch-pipeline:
+  source:
+    opensearch:
+      hosts: ["http://localhost:9200/"]
+      max_retries: 3
+      username: "admin"
+      password: "admin"
+      connection:
+        insecure: true
+        cert: "cert"
+        socket_timeout:
+        connection_timeout:
+      aws:
+        region: "us-east-1"
+        sts_role_arn: "arn:aws:iam::278936200144:role/aos-role"
+      indices:
+        include:
+          - "customdata"
+        exclude:
+          - ""
+      scheduling:
+        rate: PT1M
+        job_count: 2
+        start_time: 2023-05-25T15:18:00.00Z
+      query:
+        fields: ["play_name : Henry VI Part 1"]
+      search_options:
+        batch_size: 1002
+        expand_wildcards: "open"
+        sorting:
+          - sort_key: "line_id"
+            order: "asc"
+  sink:
+    - stdout:
