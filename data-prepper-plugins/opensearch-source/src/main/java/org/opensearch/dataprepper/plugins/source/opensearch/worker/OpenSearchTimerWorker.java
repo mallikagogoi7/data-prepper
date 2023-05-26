@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.TimerTask;
 
 public class OpenSearchTimerWorker extends TimerTask {
@@ -81,6 +82,7 @@ public class OpenSearchTimerWorker extends TimerTask {
                             sourceConfig.getSearchConfiguration().getSorting());
                 }
             }catch(OpenSearchException |ElasticsearchException searchException){
+                LOG.error("Error reading from OpenSearch/Elasticsearch: {}. Retrying with exponential backoff.", searchException.getMessage());
                 applyBackoff();
             }
         }

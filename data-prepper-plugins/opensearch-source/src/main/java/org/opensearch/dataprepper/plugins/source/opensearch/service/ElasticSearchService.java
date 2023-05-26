@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.opensearch.client.opensearch.cat.indices.IndicesRecord;
 
 /**
  * ElasticSearch service related implementation
@@ -212,7 +213,6 @@ public class ElasticSearchService {
                 catIndices = catIndices.stream().filter(c -> !(indexParametersConfiguration.getExclude().contains(c.index()))).
                         collect(Collectors.toList());
             }
-
         }
         else{
             catIndices= getOpenSearchIndicesRecords(indexParametersConfiguration,catIndices);
@@ -220,14 +220,14 @@ public class ElasticSearchService {
         return catIndices.stream().map(c->c.index()).collect(Collectors.toList());
     }
 
-    public List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> callCatElasticIndices(final ElasticsearchClient client) throws IOException, ParseException {
+    public List<IndicesRecord> callCatElasticIndices(final ElasticsearchClient client) throws IOException, ParseException {
         List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> indicesRecords=new ArrayList<>();
         client.cat().indices().valueBody().forEach(elasticSearchCatIndex->{
-            indicesRecords.add(new ObjectMapper().convertValue(elasticSearchCatIndex, org.opensearch.client.opensearch.cat.indices.IndicesRecord.class));
+            indicesRecords.add(new ObjectMapper().convertValue(elasticSearchCatIndex, IndicesRecord.class));
         });
         return indicesRecords;
     }
-    private  List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> getOpenSearchIndicesRecords(final IndexParametersConfiguration indexParametersConfiguration,
+    private  List<IndicesRecord> getOpenSearchIndicesRecords(final IndexParametersConfiguration indexParametersConfiguration,
                                                                                                           final List<org.opensearch.client.opensearch.cat.indices.IndicesRecord>  indicesRecords) {
         if (indexParametersConfiguration.getExclude() != null
                 && !indexParametersConfiguration.getExclude().isEmpty()) {
