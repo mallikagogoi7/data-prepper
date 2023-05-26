@@ -13,10 +13,16 @@ import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
+import org.opensearch.dataprepper.model.buffer.Buffer;
+import org.opensearch.dataprepper.model.event.Event;
+import org.opensearch.dataprepper.model.log.JacksonLog;
+import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.source.opensearch.OpenSearchClientBuilder;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.IndexParametersConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.SortingConfiguration;
@@ -26,7 +32,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -233,5 +242,25 @@ public class ElasticSearchService {
 
         });
         return indicesRecords;
+    }
+
+    public void writeClusterDataToBuffer(final String responseBody, final Buffer<Record<Event>> buffer) throws TimeoutException {
+        try {
+            LOG.info("Write to buffer code started {} ", buffer);
+            final JsonParser jsonParser = new JsonFactory().createParser(responseBody);
+            final Map<String, Object> innerJson = new ObjectMapper().readValue(jsonParser, Map.class);
+            Event event = JacksonLog.builder().withData(innerJson).build();
+            Record<Event> jsonRecord = new Record<>(event);
+            LOG.info("Data is pushed to buffer {} ", jsonRecord);
+            buffer.write(jsonRecord, 1200);
+
+        } catch (Exception e) {
+            LOG.error("Unable to parse json data [{}], assuming plain text", responseBody, e);
+            final Map<String, Object> plainMap = new HashMap<>();
+            plainMap.put("message", responseBody);
+            Event event = JacksonLog.builder().withData(plainMap).build();
+            Record<Event> jsonRecord = new Record<>(event);
+            buffer.write(jsonRecord, 1200);
+        }
     }
 }

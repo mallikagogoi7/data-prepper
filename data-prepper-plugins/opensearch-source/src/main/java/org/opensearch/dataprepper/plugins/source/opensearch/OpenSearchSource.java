@@ -41,7 +41,7 @@ public class OpenSearchSource implements Source<Record<Event>> {
                 openSearchSourceConfiguration,
                 hostsService,
                 openSearchService,
-                elasticSearchService);
+                elasticSearchService, buffer);
         openSearchSourceService.processHosts();
     }
 

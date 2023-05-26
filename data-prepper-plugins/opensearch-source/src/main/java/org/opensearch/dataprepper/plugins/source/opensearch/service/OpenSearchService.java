@@ -64,8 +64,6 @@ public class OpenSearchService {
         try {
             Map pitResponse = getPitInformation(index, openSearchClient);
             return pitResponse.get(PIT_ID).toString();
-        } catch (OpenSearchException openSearchException) {
-            //retry call
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -124,8 +122,6 @@ public class OpenSearchService {
         SearchPitIndexRequest searchPitIndexRequest = createSearchIndexByPitRequest(pitId, batchSize, queryFields, sortingConfigurations);
         try {
             return customHttpClient.execute(Map.class, searchPitIndexRequest, "GET", "_search");
-        } catch (OpenSearchException openSearchException) {
-            //retry call
         } catch (IOException e) {
             LOG.error("search Pit Index failed");
         }
@@ -157,6 +153,7 @@ public class OpenSearchService {
             searchPitIndexRequest.setSize(batchSize);
         }
         searchPitIndexRequest.setPit(pitInfo);
+
         return searchPitIndexRequest;
     }
 
@@ -182,10 +179,6 @@ public class OpenSearchService {
                 }
 
                 searchAfter = lastHit.getSort();
-
-
-            } catch (OpenSearchException openSearchException) {
-                //retry call
             } catch (IOException e) {
                 LOG.error("search Pit Index failed");
             } catch (TimeoutException e) {
@@ -209,17 +202,13 @@ public class OpenSearchService {
         try {
             response = client._transport().performRequest(scrollRequest, ScrollRequest.ENDPOINT, client._transportOptions());
             writeClusterDataToBuffer(mapper.writeValueAsString(response), buffer);
-        } catch (OpenSearchException openSearchException) {
-            //retry call
         } catch (IOException e) {
             LOG.error("search scroll Index failed");
         } catch (TimeoutException e) {
             LOG.error("Write operation failed " + e);
         }
         return response;
-
     }
-
 
     public boolean deletePITId(String pitId, HttpCustomClient httpCustomClient) {
         Map<String, String> inputMap = new HashMap<>();
@@ -228,8 +217,6 @@ public class OpenSearchService {
         try {
             deletePITResponse = httpCustomClient.execute(DeletePitResponse.class, inputMap, "DELETE",
                     "_search/point_in_time");
-        } catch (OpenSearchException openSearchException) {
-            //retry call
         } catch (IOException e) {
             LOG.error(" Delete operation failed " + e);
         }
@@ -238,7 +225,6 @@ public class OpenSearchService {
         } else {
             throw new RuntimeException(" Delete operation failed ");
         }
-
     }
 
     public boolean deleteScrollId(final String scrollId, final OpenSearchClient client) {
@@ -285,7 +271,7 @@ public class OpenSearchService {
                 recordsMap = searchIndexesByPITId(pitId, batchSize, queryFields, sortingConfigurations,
                         clientBuilder.createCustomHttpClient(url), buffer);
             }
-            deletePITId(recordsMap.get(PIT_ID).toString(), customHttpClient);
+           // deletePITId(recordsMap.get(PIT_ID).toString(), customHttpClient);
         } else {
             recordsMap = scrollIndexesByIndexAndUrl(indexList, openSearchClient, buffer);
             deleteScrollId(recordsMap.get("_scroll_id")!=null ?
@@ -342,6 +328,4 @@ public class OpenSearchService {
         });
         return indicesRecords;
     }
-
-
 }
