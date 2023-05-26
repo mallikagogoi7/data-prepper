@@ -21,6 +21,7 @@ import org.opensearch.client.opensearch.OpenSearchClient;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.opensearch.client.transport.OpenSearchTransport;
 import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
+import org.opensearch.dataprepper.plugins.source.opensearch.client.HttpCustomClient;
 
 /**
  * used for creating connection
@@ -58,5 +59,14 @@ public class OpenSearchClientBuilder {
         JacksonJsonpMapper jacksonJsonpMapper = new JacksonJsonpMapper();
         ElasticsearchTransport transport = new RestClientTransport(client, jacksonJsonpMapper);
         return new ElasticsearchClient(transport);
+    }
+
+    /**
+     * This will create a custom http client.
+     * @param url
+     * @return
+     */
+    public HttpCustomClient createCustomHttpClient(final URL url){
+        return new HttpCustomClient(url);
     }
 }

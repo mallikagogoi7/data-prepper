@@ -4,6 +4,7 @@
  */
 package org.opensearch.dataprepper.plugins.source.opensearch.worker;
 
+import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.plugins.source.opensearch.OpenSearchSourceConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.model.ServiceInfo;
 import org.opensearch.dataprepper.plugins.source.opensearch.service.ElasticSearchService;
@@ -11,9 +12,7 @@ import org.opensearch.dataprepper.plugins.source.opensearch.service.OpenSearchSe
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 import java.util.TimerTask;
-import java.util.stream.Collectors;
 
 public class OpenSearchTimerWorker extends TimerTask {
 
@@ -23,6 +22,8 @@ public class OpenSearchTimerWorker extends TimerTask {
 
     private OpenSearchSourceConfiguration sourceConfig;
 
+    private Buffer buffer;
+
     private ServiceInfo serviceInfo;
 
     private String host;
@@ -30,32 +31,37 @@ public class OpenSearchTimerWorker extends TimerTask {
     private static final String OPEN_SEARCH_DISTRIBUTION = "opensearch";
 
     public OpenSearchTimerWorker(
-                                 final OpenSearchService openSearchService,
-                                 final ElasticSearchService elasticSearchService,
-                                 final OpenSearchSourceConfiguration sourceConfig,
-                                 final ServiceInfo serviceInfo,
-                                 final String host) {
+            final OpenSearchService openSearchService,
+            final ElasticSearchService elasticSearchService,
+            final OpenSearchSourceConfiguration sourceConfig,
+            final Buffer buffer,
+            final ServiceInfo serviceInfo,
+            final String host) {
         this.openSearchService = openSearchService;
         this.elasticSearchService = elasticSearchService;
         this.sourceConfig = sourceConfig;
         this.serviceInfo = serviceInfo;
         this.host = host;
+        this.buffer = buffer;
+
     }
 
     @Override
     public void run() {
-        for(int jobCount=1 ; sourceConfig.getSchedulingParameterConfiguration().getJobCount() >= jobCount; jobCount++) {
+        for (int jobCount = 1; sourceConfig.getSchedulingParameterConfiguration().getJobCount() >= jobCount; jobCount++) {
             if (OPEN_SEARCH_DISTRIBUTION.equals(serviceInfo.getDistribution())) {
-
                 openSearchService.processIndexes(serviceInfo.getVersion(),
-                        getIndexList(),
+                        sourceConfig.getIndexParametersConfiguration(),
                         getUrl(),
-                        sourceConfig.getSearchConfiguration().getBatchSize(),
-                        sourceConfig.getQueryParameterConfiguration().getFields(),
-                        sourceConfig.getSearchConfiguration().getSorting());
+                        sourceConfig.getSearchConfiguration().getBatchSize(), sourceConfig.getMaxRetries(),
+                        sourceConfig.getQueryParameterConfiguration() != null ?
+                                sourceConfig.getQueryParameterConfiguration().getFields() : null,
+                        sourceConfig.getSearchConfiguration() != null ?
+                                sourceConfig.getSearchConfiguration().getSorting() : null
+                        , buffer);
             } else {
                 elasticSearchService.processIndexes(serviceInfo.getVersion(),
-                        getIndexList(),
+                        sourceConfig.getIndexParametersConfiguration(),
                         getUrl(),
                         sourceConfig.getSearchConfiguration().getBatchSize(),
                         sourceConfig.getQueryParameterConfiguration().getFields(),
@@ -74,19 +80,4 @@ public class OpenSearchTimerWorker extends TimerTask {
         return url;
     }
 
-    private String getIndexList()
-    {
-        List<String> include = sourceConfig.getIndexParametersConfiguration().getInclude();
-        List<String> exclude = sourceConfig.getIndexParametersConfiguration().getExclude();
-        String includeIndexes = null;
-        String excludeIndexes = null;
-        StringBuilder indexList = new StringBuilder();
-        if(!include.isEmpty())
-            includeIndexes = include.stream().collect(Collectors.joining(","));
-        if(!exclude.isEmpty())
-            excludeIndexes = exclude.stream().collect(Collectors.joining(",-*"));
-        indexList.append(includeIndexes);
-        indexList.append(",-*"+excludeIndexes);
-        return indexList.toString();
-    }
 }

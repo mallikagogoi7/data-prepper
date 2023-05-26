@@ -7,16 +7,18 @@ package org.opensearch.dataprepper.plugins.source.opensearch.service;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
 import co.elastic.clients.elasticsearch.core.ClearScrollRequest;
 import co.elastic.clients.elasticsearch.core.ClearScrollResponse;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.ParseException;
 import org.opensearch.dataprepper.plugins.source.opensearch.OpenSearchClientBuilder;
+import org.opensearch.dataprepper.plugins.source.opensearch.configuration.IndexParametersConfiguration;
 import org.opensearch.dataprepper.plugins.source.opensearch.configuration.SortingConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +27,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
  * ElasticSearch service related implementation
@@ -47,10 +48,16 @@ public class ElasticSearchService {
     private static final String TIME_VALUE = "24h";
 
     public void processIndexes(final Integer version,
-                               final String indexList,
+                               final IndexParametersConfiguration indexParametersConfiguration,
                                final URL url,
                                final Integer batchSize, List<String> fields, List<SortingConfiguration> sorting) {
         ElasticsearchClient client = clientBuilder.createElasticSearchClient(url);
+        String indexList= null;
+        try {
+            indexList = getIndexList(getFilteredIndices(indexParametersConfiguration,client));
+        } catch (IOException | ParseException e) {
+            LOG.error("Operation failed ",e);
+        }
         List<JSONObject> recordsMap = null;
         if(version > ELASTIC_SEARCH_VERSION) {
             if(batchSize > BATCH_SIZE_VALUE) {
@@ -67,10 +74,7 @@ public class ElasticSearchService {
     }
 
 
-    public List<IndicesRecord> getCatElasticSearchIndices(final ElasticsearchClient esClient){
-        // if response is not 200 then will call BackoffService for retry
-        return null;
-    }
+
 
     public List<JSONObject> searchIndexes(final ElasticsearchClient client, final String indexList, List<String> fields) {
         List<JSONObject> jsonObjects = null;
@@ -174,5 +178,60 @@ public class ElasticSearchService {
             LOG.error("Error while processing searchIndexes " , ex);
         }
         return response;
+    }
+
+    private String getIndexList(final List<String> filteredIndexList) {
+        String includeIndexes = null;
+        StringBuilder indexList = new StringBuilder();
+        if (!filteredIndexList.isEmpty()) {
+            includeIndexes = filteredIndexList.stream().collect(Collectors.joining(","));
+        }
+        indexList.append(includeIndexes);
+        return indexList.toString();
+    }
+
+    private List<String> getFilteredIndices(final IndexParametersConfiguration indexParametersConfiguration,
+                                            final ElasticsearchClient elasticsearchClient) throws IOException, ParseException {
+        List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> catIndices = new ArrayList<>();
+        if (indexParametersConfiguration != null && indexParametersConfiguration.getInclude() == null ||
+                indexParametersConfiguration != null && indexParametersConfiguration.getInclude().isEmpty()) {
+            catIndices = callCatElasticIndices(elasticsearchClient);
+
+
+            if (indexParametersConfiguration != null && indexParametersConfiguration.getExclude() != null
+                    && !indexParametersConfiguration.getExclude().isEmpty()) {
+                catIndices = catIndices.stream().filter(c -> !(indexParametersConfiguration.getExclude().contains(c.index()))).
+                        collect(Collectors.toList());
+            }
+
+        }
+        else{
+            catIndices= getOpenSearchIndicesRecords(indexParametersConfiguration,catIndices);
+        }
+        return catIndices.stream().map(c->c.index()).collect(Collectors.toList());
+    }
+
+    public List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> callCatElasticIndices(final ElasticsearchClient client) throws IOException, ParseException {
+        List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> indicesRecords=new ArrayList<>();
+        client.cat().indices().valueBody().forEach(elasticSearchCatIndex->{
+            indicesRecords.add(new ObjectMapper().convertValue(elasticSearchCatIndex, org.opensearch.client.opensearch.cat.indices.IndicesRecord.class));
+        });
+        return indicesRecords;
+    }
+    private  List<org.opensearch.client.opensearch.cat.indices.IndicesRecord> getOpenSearchIndicesRecords(final IndexParametersConfiguration indexParametersConfiguration,
+                                                                                                          final List<org.opensearch.client.opensearch.cat.indices.IndicesRecord>  indicesRecords) {
+        if (indexParametersConfiguration.getExclude() != null
+                && !indexParametersConfiguration.getExclude().isEmpty()) {
+            List<String> filteredIncludeIndexes = indexParametersConfiguration.getInclude().stream()
+                    .filter(index -> !(indexParametersConfiguration.getExclude().contains(index))).collect(Collectors.toList());
+            indexParametersConfiguration.setInclude(filteredIncludeIndexes);
+        }
+        indexParametersConfiguration.getInclude().forEach(index -> {
+            org.opensearch.client.opensearch.cat.indices.IndicesRecord indexRecord =
+                    new org.opensearch.client.opensearch.cat.indices.IndicesRecord.Builder().index(index).build();
+            indicesRecords.add(indexRecord);
+
+        });
+        return indicesRecords;
     }
 }
