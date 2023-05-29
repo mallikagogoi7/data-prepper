@@ -15,8 +15,10 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 import org.opensearch.dataprepper.model.buffer.Buffer;
@@ -46,6 +48,7 @@ public class ElasticSearchService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElasticSearchService.class);
     private OpenSearchClientBuilder clientBuilder;
+
     public ElasticSearchService(OpenSearchClientBuilder clientBuilder){
         this.clientBuilder = clientBuilder;
     }
@@ -53,14 +56,18 @@ public class ElasticSearchService {
 
     private static final int ELASTIC_SEARCH_VERSION = 7100;
 
-    private static final int SEARCH_AFTER_SIZE = 100;
+    private static final int SEARCH_AFTER_SIZE = 20;
 
     private static final String TIME_VALUE = "24h";
+
+    private static final String SOURCE = "_source";
+
+    private ObjectMapper mapper = new ObjectMapper();
 
     public void processIndexes(final Integer version,
                                final IndexParametersConfiguration indexParametersConfiguration,
                                final URL url,
-                               final Integer batchSize, List<String> fields, List<SortingConfiguration> sorting) {
+                               final Integer batchSize, final List<String> fields,final List<SortingConfiguration> sorting, final Buffer buffer) {
         ElasticsearchClient client = clientBuilder.createElasticSearchClient(url);
         String indexList= null;
         try {
@@ -68,60 +75,79 @@ public class ElasticSearchService {
         } catch (IOException | ParseException e) {
             LOG.error("Operation failed ",e);
         }
-        List<JSONObject> recordsMap = null;
         if(version > ELASTIC_SEARCH_VERSION) {
             if(batchSize > BATCH_SIZE_VALUE) {
-                searchIndexesForPagination(client, indexList, fields, sorting, batchSize, 0L);
+                searchIndexesForPagination(client, indexList, fields, sorting, batchSize, 0L, buffer);
             }
             else {
-                recordsMap = searchIndexes(client, indexList, fields);
+                searchIndexes(client, indexList, fields, buffer);
             }
         }else{
-            recordsMap =scrollIndexesByIndexAndUrl(client, indexList, url.getHost(),batchSize);
-            //deleteScrollId(client, recordsMap.get("scroll_id"));
+            String scrollId =scrollIndexesByIndexAndUrl(client, indexList, url.getHost(),batchSize, buffer);
+            deleteScrollId(client, scrollId);
         }
-        // push recordsMap to Buffer
     }
 
 
 
 
-    public List<JSONObject> searchIndexes(final ElasticsearchClient client, final String indexList, List<String> fields) {
+    public List<JSONObject> searchIndexes(final ElasticsearchClient client, final String indexList, List<String> fields, final Buffer buffer) {
         List<JSONObject> jsonObjects = null;
         SearchResponse searchResponse = null;
         try {
-            String[] queryParam = fields.get(0).split(":");
-            searchResponse = client.search(SearchRequest
-                    .of(e -> e.index(indexList.toString()).query(q -> q.match(t -> t
-                                    .field(queryParam[0].trim())
-                                    .query(queryParam[1].trim())))), JSONObject.class);
-            LOG.info("Search Response {} ", searchResponse);
-            jsonObjects = searchResponse.hits().hits();
+            if (fields != null) {
+                String[] queryParam = fields.get(0).split(":");
+                searchResponse = client.search(SearchRequest
+                        .of(e -> e.index(indexList.toString()).query(q -> q.match(t -> t
+                                .field(queryParam[0].trim())
+                                .query(queryParam[1].trim())))), JSONObject.class);
+            }else{
+                searchResponse = client.search(SearchRequest
+                        .of(e -> e.index(indexList.toString())), JSONObject.class);
+            }
 
+            searchResponse.hits().hits().forEach(message-> {
+                try {
+                    LOG.info(" message.toString() " + message.toString().replace("Hit:",""));
+                    writeClusterDataToBuffer(message.toString().replace("Hit:",""), buffer);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            LOG.info("Search Response {} ", searchResponse);
         } catch (Exception ex) {
             LOG.error("Error while processing searchIndexes " , ex);
         }
         return jsonObjects;
     }
-    public void searchIndexesForPagination(final ElasticsearchClient client, final String indexList, List<String> fields, List<SortingConfiguration> sorting, int currentBatchSize, long currentSearchAfterValue){
-        SearchResponse response = getSearchResponse(client, indexList, fields,sorting,currentSearchAfterValue);
+    public void searchIndexesForPagination(final ElasticsearchClient client, final String indexList, List<String> fields, List<SortingConfiguration> sorting, int currentBatchSize, long currentSearchAfterValue, Buffer buffer){
+        SearchResponse response = getSearchResponse(client, indexList, fields,sorting,currentSearchAfterValue, buffer);
         currentBatchSize = currentBatchSize - SEARCH_AFTER_SIZE;
         currentSearchAfterValue = getSortValueFromResponse(response);
         if(currentBatchSize > 0) {
-            searchIndexesForPagination(client, indexList, fields,sorting,currentBatchSize, currentSearchAfterValue);
+            searchIndexesForPagination(client, indexList, fields,sorting,currentBatchSize, currentSearchAfterValue, buffer);
         }
     }
 
-    public List<JSONObject> scrollIndexesByIndexAndUrl(ElasticsearchClient client, final String indexList, final String url, Integer batchSize) {
+    public String scrollIndexesByIndexAndUrl(ElasticsearchClient client, final String indexList, final String url, final Integer batchSize, final Buffer buffer) {
         List<JSONObject> jsonObjects= null;
         SearchRequest searchRequest = SearchRequest
                 .of(e -> e.index(indexList).size(batchSize).scroll(scr -> scr.time(TIME_VALUE)));
         try {
             SearchResponse response = client.search(searchRequest, ObjectNode.class);
+            response.hits().hits().forEach(message-> {
+                try {
+                    writeClusterDataToBuffer(message.toString().replace("Hit:",""), buffer);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            return response.scrollId();
         } catch (IOException e) {
-            LOG.error(e.getMessage());
+            LOG.error("Error while processing searchIndexes " , e);
         }
-        return jsonObjects;
+        throw new RuntimeException("Error while processing searchIndexes");
     }
 
     public boolean deleteScrollId(final ElasticsearchClient client, final String scrollId) {
@@ -164,7 +190,7 @@ public class ElasticSearchService {
         return sortValue;
     }
 
-    public SearchResponse getSearchResponse(final ElasticsearchClient client, final String indexList, List<String> fields, List<SortingConfiguration> sorting, final long searchAfter) {
+    public SearchResponse getSearchResponse(final ElasticsearchClient client, final String indexList, List<String> fields, List<SortingConfiguration> sorting, final long searchAfter, final Buffer buffer) {
         SearchResponse response = null;
         SearchRequest searchRequest = null;
 
@@ -183,6 +209,13 @@ public class ElasticSearchService {
         }
         try {
             response = client.search(searchRequest, JSONObject.class);
+            response.hits().hits().forEach(message-> {
+                try {
+                    writeClusterDataToBuffer(message.toString().replace("Hit:",""), buffer);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            });
             LOG.info("Response of getSearchForSort : {} ", response);
         }catch (IOException ex){
             LOG.error("Error while processing searchIndexes " , ex);
@@ -244,23 +277,18 @@ public class ElasticSearchService {
         return indicesRecords;
     }
 
-    public void writeClusterDataToBuffer(final String responseBody, final Buffer<Record<Event>> buffer) throws TimeoutException {
+    public void writeClusterDataToBuffer(final String message, final Buffer<Record<Event>> buffer) throws TimeoutException {
         try {
             LOG.info("Write to buffer code started {} ", buffer);
-            final JsonParser jsonParser = new JsonFactory().createParser(responseBody);
-            final Map<String, Object> innerJson = new ObjectMapper().readValue(jsonParser, Map.class);
-            Event event = JacksonLog.builder().withData(innerJson).build();
+            final JsonParser jsonParser = new JsonFactory().createParser(message);
+            final Map<String, Object> innerJson = mapper.readValue(jsonParser, Map.class);
+            Event event = JacksonLog.builder().withData(innerJson.get(SOURCE)).build();
             Record<Event> jsonRecord = new Record<>(event);
-            LOG.info("Data is pushed to buffer {} ", jsonRecord);
+            LOG.info("Data is pushed to buffer {} ", jsonRecord.getData());
             buffer.write(jsonRecord, 1200);
 
         } catch (Exception e) {
-            LOG.error("Unable to parse json data [{}], assuming plain text", responseBody, e);
-            final Map<String, Object> plainMap = new HashMap<>();
-            plainMap.put("message", responseBody);
-            Event event = JacksonLog.builder().withData(plainMap).build();
-            Record<Event> jsonRecord = new Record<>(event);
-            buffer.write(jsonRecord, 1200);
+            LOG.error("Unable to parse json data [{}], assuming plain text", message, e);
         }
     }
 }

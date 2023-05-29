@@ -20,15 +20,19 @@ opensearch-pipeline:
           - ""
       scheduling:
         rate: PT1M
-        job_count: 2
+        job_count: 1
         start_time: 2023-05-25T15:18:00.00Z
       query:
         fields: ["play_name : Henry VI Part 1"]
       search_options:
-        batch_size: 1002
+        batch_size: 10
         expand_wildcards: "open"
         sorting:
           - sort_key: "line_id"
             order: "asc"
   sink:
     - stdout:
+    - opensearch:
+        hosts: ["http://localhost:9200"]
+        insecure: true
+        index: output10

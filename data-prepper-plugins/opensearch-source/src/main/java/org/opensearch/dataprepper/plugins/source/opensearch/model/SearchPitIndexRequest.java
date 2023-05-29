@@ -17,9 +17,9 @@ public class SearchPitIndexRequest implements Serializable {
 
     private PitInformation pit;
 
-    private Map<String,String> query;
+    private Map<String,Object> query;
 
-    private List<SortingConfiguration> sort;
+    private List<Map<String,String>> sort;
 
     @JsonProperty("search_after")
     private List<Integer> searchAfter;
@@ -32,19 +32,19 @@ public class SearchPitIndexRequest implements Serializable {
         this.searchAfter = searchAfter;
     }
 
-    public List<SortingConfiguration> getSort() {
+    public List<Map<String,String>> getSort() {
         return sort;
     }
 
-    public void setSort(List<SortingConfiguration> sort) {
+    public void setSort(List<Map<String,String>> sort) {
         this.sort = sort;
     }
 
-    public Map<String, String> getQuery() {
+    public Map<String, Object> getQuery() {
         return query;
     }
 
-    public void setQuery(Map<String, String> query) {
+    public void setQuery(Map<String, Object> query) {
         this.query = query;
     }
 

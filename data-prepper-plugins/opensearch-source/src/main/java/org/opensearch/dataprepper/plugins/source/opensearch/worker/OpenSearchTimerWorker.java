@@ -79,7 +79,7 @@ public class OpenSearchTimerWorker extends TimerTask {
                             getUrl(),
                             sourceConfig.getSearchConfiguration().getBatchSize(),
                             sourceConfig.getQueryParameterConfiguration().getFields(),
-                            sourceConfig.getSearchConfiguration().getSorting());
+                            sourceConfig.getSearchConfiguration().getSorting(), buffer);
                 }
             }catch(OpenSearchException |ElasticsearchException searchException){
                 LOG.error("Error reading from OpenSearch/Elasticsearch: {}. Retrying with exponential backoff.", searchException.getMessage());

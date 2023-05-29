@@ -59,6 +59,8 @@ public class OpenSearchService {
 
     private ObjectMapper mapper = new ObjectMapper();
 
+    private static final String SOURCE = "_source";
+
 
     public String getPITId(final String index, OpenSearchClient openSearchClient, Integer maxRetries) {
         try {
@@ -86,34 +88,41 @@ public class OpenSearchService {
                                                     final HttpCustomClient customHttpClient,
                                                     Buffer buffer) {
         Map response = searchIndexeByPitId(pitId, batchSize, queryFields, sortingConfigurations, customHttpClient);
-        LOG.debug(" Search Pit Response " + response);
+        LOG.info(" Search Pit Response " + response);
         try {
-            writeClusterDataToBuffer(mapper.writeValueAsString(response), buffer);
-        } catch (TimeoutException | JsonProcessingException e) {
-            LOG.error("Write operation failed " + e);
+            Map<String,Object> hits = (Map<String, Object>) response.get("hits");
+            List<Map<String, Object>> hitList = (List<Map<String, Object>>) hits.get("hits");
+            LOG.info("hitList::::: "+ hitList);
+            hitList.forEach(message-> {
+                try {
+                    LOG.info("::::::::::: message.toString()::::::::: "+ message.toString());
+                    writeClusterDataToBuffer(message.toString(), buffer);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+        } catch (Exception ex) {
+            LOG.error("Write operation failed " + ex);
         }
         return response;
     }
 
-    public void writeClusterDataToBuffer(final String responseBody, final Buffer<Record<Event>> buffer) throws TimeoutException {
+    private void writeClusterDataToBuffer(final String message, final Buffer<Record<Event>> buffer) throws TimeoutException {
         try {
             LOG.info("Write to buffer code started {} ", buffer);
-            final JsonParser jsonParser = new JsonFactory().createParser(responseBody);
+            final JsonParser jsonParser = new JsonFactory().createParser(message);
             final Map<String, Object> innerJson = mapper.readValue(jsonParser, Map.class);
-            Event event = JacksonLog.builder().withData(innerJson).build();
+            Event event = JacksonLog.builder().withData(innerJson.get(SOURCE)).build();
             Record<Event> jsonRecord = new Record<>(event);
-            LOG.info("Data is pushed to buffer {} ", jsonRecord);
+            LOG.info("Data is pushed to buffer {} ", jsonRecord.getData());
             buffer.write(jsonRecord, 1200);
 
         } catch (Exception e) {
-            LOG.error("Unable to parse json data [{}], assuming plain text", responseBody, e);
-            final Map<String, Object> plainMap = new HashMap<>();
-            plainMap.put("message", responseBody);
-            Event event = JacksonLog.builder().withData(plainMap).build();
-            Record<Event> jsonRecord = new Record<>(event);
-            buffer.write(jsonRecord, 1200);
+            LOG.error("Unable to parse json data [{}], assuming plain text", message, e);
         }
     }
+
 
 
     private Map searchIndexeByPitId(final String pitId, Integer batchSize, List<String> queryFields, List<SortingConfiguration> sortingConfigurations,
@@ -136,17 +145,25 @@ public class OpenSearchService {
         pitInfo.setKeepAlive(KEEP_ALIVE_VALUE);
 
         if (queryFields != null && !queryFields.isEmpty()) {
-            final Map<String, String> queryMap = new HashMap<>();
+            final Map<String, Object> queryMap = new HashMap<>();
 
             queryFields.forEach(q -> {
                 String[] queryObj = q.split(":");
-                queryMap.put(queryObj[0].trim(), queryObj[1].trim());
+                Map<String, String> matchMap = new HashMap<>();
+                matchMap.put(queryObj[0].trim(), queryObj[1].trim());
+                queryMap.put("match",matchMap);
             });
             searchPitIndexRequest.setQuery(queryMap);
         }
 
         if (sorting != null && !sorting.isEmpty()) {
-            searchPitIndexRequest.setSort(sorting);
+            List<Map<String,String>> sortList = new ArrayList<>();
+            sorting.forEach(s->{
+                Map<String,String> sortMap=new HashMap<>();
+                sortMap.put(s.getSortKey(),s.getOrder());
+                sortList.add(sortMap);
+            });
+            searchPitIndexRequest.setSort(sortList);
         }
 
         if (BATCH_SIZE_VALUE > batchSize) {
@@ -158,7 +175,7 @@ public class OpenSearchService {
     }
 
 
-    public Map<String, Object> searchIndexesByPITIdForPagination(String pitId, Integer batchSize, List<String> queryFields, List<SortingConfiguration>
+    public Map<String,Object> searchIndexesByPITIdForPagination(String pitId, Integer batchSize, List<String> queryFields, List<SortingConfiguration>
             sortingConfigurations
             , HttpCustomClient httpCustomClient, Buffer buffer) {
 
@@ -177,15 +194,16 @@ public class OpenSearchService {
                 if (!hits.isEmpty()) {
                     lastHit = hits.get(hits.size() - 1);
                 }
-
                 searchAfter = lastHit.getSort();
+                Map<String,Object> responseMap=new HashMap<>();
+                responseMap.put("pit_id",response.getPitId());
+                return responseMap;
             } catch (IOException e) {
                 LOG.error("search Pit Index failed");
             } catch (TimeoutException e) {
                 LOG.error("Write operation failed " + e);
             }
             batchSize = batchSize - sizeForPagination;
-
         }
 
         throw new RuntimeException("search Pit Index failed");
@@ -211,6 +229,7 @@ public class OpenSearchService {
     }
 
     public boolean deletePITId(String pitId, HttpCustomClient httpCustomClient) {
+        LOG.info("pitId :::; " + pitId);
         Map<String, String> inputMap = new HashMap<>();
         inputMap.put(PIT_ID, pitId);
         DeletePitResponse deletePITResponse = null;
@@ -271,7 +290,7 @@ public class OpenSearchService {
                 recordsMap = searchIndexesByPITId(pitId, batchSize, queryFields, sortingConfigurations,
                         clientBuilder.createCustomHttpClient(url), buffer);
             }
-           // deletePITId(recordsMap.get(PIT_ID).toString(), customHttpClient);
+            //deletePITId(recordsMap.get(PIT_ID).toString(), customHttpClient);
         } else {
             recordsMap = scrollIndexesByIndexAndUrl(indexList, openSearchClient, buffer);
             deleteScrollId(recordsMap.get("_scroll_id")!=null ?
