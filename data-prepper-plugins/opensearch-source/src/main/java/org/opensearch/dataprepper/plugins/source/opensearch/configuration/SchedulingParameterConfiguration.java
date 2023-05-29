@@ -5,28 +5,29 @@
 
 package org.opensearch.dataprepper.plugins.source.opensearch.configuration;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.AssertTrue;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import jakarta.validation.constraints.Min;
 
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 public class SchedulingParameterConfiguration {
 
     @JsonProperty("rate")
-    private Duration rate = Duration.ofHours(8);
+    private Duration rate;
 
     @Min(1)
     @JsonProperty("job_count")
     private int jobCount = 1;
 
+    @JsonSerialize(using = LocalDateTimeSerializer.class)
+    @JsonDeserialize(using = LocalDateTimeDeserializer.class)
     @JsonProperty("start_time")
-    private String startTime = Instant.now().toString();
-
-    @JsonIgnore
-    private Instant startTimeInstant;
+    private LocalDateTime startTime = LocalDateTime.now();
 
     public Duration getRate() {
         return rate;
@@ -36,17 +37,7 @@ public class SchedulingParameterConfiguration {
         return jobCount;
     }
 
-    public Instant getStartTime() {
-        return startTimeInstant;
-    }
-
-    @AssertTrue(message = "start_time must be a valid Java Instant format such as \"2007-12-03T10:15:30.00Z\"")
-    boolean isStartTimeValid() {
-        try {
-            startTimeInstant = Instant.parse(startTime);
-            return true;
-        } catch (final Exception e) {
-            return false;
-        }
+    public LocalDateTime getStartTime() {
+        return startTime;
     }
 }

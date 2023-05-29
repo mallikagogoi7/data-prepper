@@ -10,11 +10,18 @@ import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.source.Source;
+import org.opensearch.dataprepper.plugins.source.opensearch.service.ElasticSearchService;
+import org.opensearch.dataprepper.plugins.source.opensearch.service.HostsService;
+import org.opensearch.dataprepper.plugins.source.opensearch.service.OpenSearchService;
+
+import java.time.Duration;
 
 @DataPrepperPlugin(name="opensearch", pluginType = Source.class , pluginConfigurationType =OpenSearchSourceConfiguration.class )
 public class OpenSearchSource implements Source<Record<Event>> {
 
     private final OpenSearchSourceConfiguration openSearchSourceConfiguration;
+
+    private OpenSearchSourceService openSearchSourceService;
 
     @DataPrepperPluginConstructor
     public OpenSearchSource(final OpenSearchSourceConfiguration openSearchSourceConfiguration) {
@@ -26,16 +33,20 @@ public class OpenSearchSource implements Source<Record<Event>> {
         if (buffer == null) {
             throw new IllegalStateException("Buffer provided is null");
         }
-        startProcess(openSearchSourceConfiguration);
-    }
-
-    private void startProcess(final OpenSearchSourceConfiguration openSearchSourceConfiguration)  {
-        // todo: implement
-        // Should leverage OpenSearchService to run the actual plugin core logic.
+        HostsService hostsService = new HostsService();
+        OpenSearchClientBuilder clientBuilder = new OpenSearchClientBuilder();
+        OpenSearchService openSearchService = new OpenSearchService(clientBuilder);
+        ElasticSearchService elasticSearchService = new ElasticSearchService(clientBuilder);
+        openSearchSourceService = new OpenSearchSourceService(
+                openSearchSourceConfiguration,
+                hostsService,
+                openSearchService,
+                elasticSearchService, buffer);
+        openSearchSourceService.processHosts();
     }
 
     @Override
     public void stop() {
-      // Yet to implement
+        openSearchSourceService.stop();
     }
 }

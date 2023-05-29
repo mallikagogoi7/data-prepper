@@ -5,9 +5,7 @@
 package org.opensearch.dataprepper.plugins.source.opensearch.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.nio.file.Path;
-import java.time.Duration;
 
 public class ConnectionConfiguration {
 
@@ -15,23 +13,23 @@ public class ConnectionConfiguration {
   private Path certPath;
 
   @JsonProperty("socket_timeout")
-  private Duration socketTimeout;
+  private Integer socketTimeout;
 
   @JsonProperty("connection_timeout")
-  private Duration connectTimeout;
+  private Integer connectTimeout;
 
   @JsonProperty("insecure")
-  private boolean insecure = false;
+  private boolean insecure;
 
   public Path getCertPath() {
     return certPath;
   }
 
-  public Duration getSocketTimeout() {
+  public Integer getSocketTimeout() {
     return socketTimeout;
   }
 
-  public Duration getConnectTimeout() {
+  public Integer getConnectTimeout() {
     return connectTimeout;
   }
 

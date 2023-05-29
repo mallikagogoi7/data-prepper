@@ -9,19 +9,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.junit.Test;
+import java.util.List;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-public class SchedulingParameterConfigurationTest {
+public class QueryParameterConfigurationTest {
+
 
     private ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.USE_PLATFORM_LINE_BREAKS));
 
     @Test
-    public void scheduling_parameter_configuration_test() throws JsonProcessingException {
-
-        final String schedulingParameterYaml = "  job_count: 3";
-        final SchedulingParameterConfiguration schedulingParameterConfiguration = objectMapper.readValue(schedulingParameterYaml, SchedulingParameterConfiguration.class);
-        assertThat(schedulingParameterConfiguration.getJobCount(),equalTo(3));
+    public void query_params_config_values_test() throws JsonProcessingException {
+        final String queryConfigurationYaml =
+                "  fields: [\"test_variable : test_value\"]";
+        final QueryParameterConfiguration queryParameterConfiguration = objectMapper.readValue(queryConfigurationYaml, QueryParameterConfiguration.class);
+        assertThat(queryParameterConfiguration.getFields(),equalTo(List.of("test_variable : test_value")));
     }
 }
