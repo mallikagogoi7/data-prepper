@@ -29,7 +29,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 import java.time.Duration;
 
-public class CertificateProviderFactory {
+public class  CertificateProviderFactory {
     private static final Logger LOG = LoggerFactory.getLogger(CertificateProviderFactory.class);
 
     private static final int ACM_CLIENT_RETRIES = 10;

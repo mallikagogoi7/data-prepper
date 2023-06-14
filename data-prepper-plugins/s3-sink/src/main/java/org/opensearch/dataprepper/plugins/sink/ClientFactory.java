@@ -5,6 +5,7 @@
 
 package org.opensearch.dataprepper.plugins.sink;
 
+import kotlin.jvm.internal.Lambda;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsOptions;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.plugins.sink.configuration.AwsAuthenticationOptions;
