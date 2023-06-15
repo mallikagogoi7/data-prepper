@@ -6,8 +6,6 @@ package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.Map;
-
 public class CustomHeaderOptions {
 
     @JsonProperty("X-Amzn-SageMaker-Custom-Attributes")

@@ -8,32 +8,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.CredentialsProvider;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
-import org.apache.hc.client5.http.config.TlsConfig;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.hc.core5.http.ssl.TLS;
-import org.apache.hc.core5.ssl.SSLContexts;
-import org.apache.hc.core5.util.Timeout;
 import org.opensearch.dataprepper.plugins.sink.AuthHandler;
-import org.opensearch.dataprepper.plugins.sink.HttpSinkConfiguration;
+import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -131,7 +122,7 @@ public class HttpSinkService {
                             if (getAuthTypeFromConf(urlConfOption).equals(AUTH_BEARER_TOKEN)) {
                                 if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_BEARER_TOKEN)) {
                                     String token = httpSinkConf.getAuthentication().getPluginSettings().get("token").toString();
-                                    httpPost.addHeader("Authorization", "Bearer" +token);
+                                    httpPost.addHeader("Authorization", "Bearer " +token);
                                 }
                             }
                             CloseableHttpClient httpclient = HttpClients.custom()

@@ -10,8 +10,7 @@ log-pipeline:
           codec:
             ndjson:
           http_method: "POST"
-          auth_type: "bearer_token"
-        aws_sigv4: true
+          auth_type: "http_basic"
         proxy:
         codec:
           ndjson:
@@ -23,7 +22,7 @@ log-pipeline:
             password: "vip"
           bearer_token:
             token: ""
-        ssl: true
+        insecure: false
         ssl_certificate_file: "/full/path/to/certfile.crt"
         ssl_key_file: "/full/path/to/keyfile.key"
         buffer_type: "in_memory"
@@ -35,4 +34,5 @@ log-pipeline:
           maximum_size: 2mb
           event_collect_timeout: PT2M
         max_retries: 5
+        aws_sigv4: true
         custom_header:

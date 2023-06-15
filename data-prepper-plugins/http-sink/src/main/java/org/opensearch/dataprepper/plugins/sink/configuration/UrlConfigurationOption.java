@@ -10,12 +10,16 @@ import org.opensearch.dataprepper.model.configuration.PluginModel;
 
 public class UrlConfigurationOption {
 
+    private static final int DEFAULT_WORKERS = 1;
+
+    private static final String DEFAULT_HTTP_METHOD = "POST";
+
     @NotNull
     @JsonProperty("url")
     private String url;
 
     @JsonProperty("workers")
-    private Integer workers;
+    private Integer workers = DEFAULT_WORKERS;
 
     @JsonProperty("proxy")
     private String proxy;
@@ -24,7 +28,7 @@ public class UrlConfigurationOption {
     private PluginModel codec;
 
     @JsonProperty("http_method")
-    private String httpMethod;
+    private String httpMethod = DEFAULT_HTTP_METHOD;
 
     @JsonProperty("auth_type")
     private String authType;

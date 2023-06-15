@@ -2,17 +2,14 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-package org.opensearch.dataprepper.plugins.sink;
+package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.plugins.sink.accumulator.BufferTypeOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.AwsAuthenticationOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.ThresholdOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
+
 
 import java.util.List;
 
@@ -20,17 +17,22 @@ public class HttpSinkConfiguration {
 
     private static final int DEFAULT_UPLOAD_RETRIES = 5;
 
-    private static final int DEFAULT_CONNECTION_RETRIES = 5;
+    private static final String DEFAULT_HTTP_METHOD = "POST";
+
+    private static final int DEFAULT_WORKERS = 1;
 
     @NotNull
     @JsonProperty("urls")
     private List<UrlConfigurationOption> urlConfigurationOptions;
 
+    @JsonProperty("workers")
+    private Integer workers = DEFAULT_WORKERS;
+
     @JsonProperty("codec")
     private PluginModel codec;
 
     @JsonProperty("http_method")
-    private String httpMethod;
+    private String httpMethod = DEFAULT_HTTP_METHOD;
 
     @JsonProperty("proxy")
     private String proxy;
@@ -40,8 +42,8 @@ public class HttpSinkConfiguration {
 
     private PluginModel authentication;
 
-    @JsonProperty("ssl")
-    private boolean ssl;
+    @JsonProperty("insecure")
+    private boolean insecure;
 
     @JsonProperty("ssl_certificate_file")
     private String sslCertificateFile;
@@ -56,7 +58,6 @@ public class HttpSinkConfiguration {
     private BufferTypeOptions bufferType = BufferTypeOptions.INMEMORY;
 
     @JsonProperty("threshold")
-    @NotNull
     private ThresholdOptions thresholdOptions;
 
     @JsonProperty("max_retries")
@@ -68,8 +69,6 @@ public class HttpSinkConfiguration {
 
     @JsonProperty("custom_header")
     private CustomHeaderOptions customHeaderOptions;
-
-    private int maxConnectionRetries = DEFAULT_CONNECTION_RETRIES;
 
     public List<UrlConfigurationOption> getUrlConfigurationOptions() {
         return urlConfigurationOptions;
@@ -95,8 +94,8 @@ public class HttpSinkConfiguration {
         return authentication;
     }
 
-    public boolean isSsl() {
-        return ssl;
+    public boolean isInsecure() {
+        return insecure;
     }
 
     public String getSslCertificateFile() {
@@ -131,7 +130,7 @@ public class HttpSinkConfiguration {
         return awsAuthenticationOptions;
     }
 
-    public int getMaxConnectionRetries() {
-        return maxConnectionRetries;
+    public Integer getWorkers() {
+        return workers;
     }
 }
