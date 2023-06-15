@@ -4,10 +4,11 @@
  */
 package org.opensearch.dataprepper.plugins.sink.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.auth.AuthScope;
-import org.apache.hc.client5.http.auth.CredentialsProvider;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Base64;
 
 public class HttpSinkService {
 
@@ -60,13 +62,10 @@ public class HttpSinkService {
 
     public String getHttpMethodFromConf(UrlConfigurationOption urlConfOption) throws Exception {
         String httpMethod = urlConfOption.getHttpMethod()!=null? urlConfOption.getHttpMethod(): httpSinkConf.getHttpMethod();
-        if(httpMethod == null) {
-            httpMethod = HTTP_METHOD_DEFAULT;
+        if(httpMethod.equals(HTTP_METHOD_DEFAULT) || httpMethod.equals(HTTP_METHOD_PUT)){
+            return httpMethod;
         }
-        if(httpMethod != HTTP_METHOD_DEFAULT || httpMethod != HTTP_METHOD_PUT){
-            throw new Exception("Provide POST/PUT Http Method");
-        }
-        return httpMethod;
+        throw new Exception("Http Method should to POST/PUT");
     }
 
     public String getAuthTypeFromConf(UrlConfigurationOption urlConfOption) {
@@ -88,66 +87,104 @@ public class HttpSinkService {
         return provider;
     }
 
+    private static final String getBasicAuthenticationHeader(String username, String password) {
+        String valueToEncode = username + ":" + password;
+        return "Basic " + Base64.getEncoder().encodeToString(valueToEncode.getBytes());
+    }
+
     public void getBearerTokenProvider(){
 
     }
 
-    public void sendHttpRequest(String encodedEvent) throws IOException, InterruptedException {
+    public void sendHttpRequest(String encodedEvent) throws IOException, InterruptedException, URISyntaxException {
         for(UrlConfigurationOption urlConfOption: httpSinkConf.getUrlConfigurationOptions()) {
             if(getProxyFromConf(urlConfOption) == null) {
-                try {
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    String requestBody = objectMapper
-                            .writeValueAsString(encodedEvent);
-
-                    HttpClientContext clientContext = HttpClientContext.create();
-
-                    switch (getHttpMethodFromConf(urlConfOption)) {
-                        case "POST":
-                            ClassicHttpRequest httpPost = null;
-                            CredentialsProvider provider= null;
-
-                            httpPost = ClassicRequestBuilder.post(urlConfOption.getUrl())
-                                    .setEntity(requestBody)
-                                    .build();
-
-                            if (getAuthTypeFromConf(urlConfOption).equals(AUTH_HTTP_BASIC)) {
-                                if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_HTTP_BASIC)) {
-                                    String username = httpSinkConf.getAuthentication().getPluginSettings().get("username").toString();
-                                    String password = httpSinkConf.getAuthentication().getPluginSettings().get("password").toString();
-                                    provider = getBasicCredProvider(username,password, urlConfOption.getUrl());
-                                }
-                            }
-
-                            if (getAuthTypeFromConf(urlConfOption).equals(AUTH_BEARER_TOKEN)) {
-                                if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_BEARER_TOKEN)) {
-                                    String token = httpSinkConf.getAuthentication().getPluginSettings().get("token").toString();
-                                    httpPost.addHeader("Authorization", "Bearer " +token);
-                                }
-                            }
-                            CloseableHttpClient httpclient = HttpClients.custom()
-                                    .setConnectionManager(authHandler.sslConnection())
-                                    .setDefaultCredentialsProvider(provider)
-                                    .build();
-
-                            LOG.info("  [MG]--> Request: " + httpPost);
-                            httpclient.execute(httpPost, clientContext, response -> {
-                                System.out.println(response.getCode() + " " + response.getReasonPhrase());
-                                final HttpEntity entity = response.getEntity();
-                                EntityUtils.consume(entity);
-                                SSLSession sslSession = clientContext.getSSLSession();
-                                if (sslSession != null) {
-                                    LOG.info(" [MG]--> SSL Protocol : " + sslSession.getProtocol());
-                                    LOG.info(" [MG]--> SSL Cipher Suit : " + sslSession.getCipherSuite());
-                                }
-                                return null;
-                            });
-                            break;
-                    }
-                } catch (Exception e) {
-
-                }
+                executeHttpClient(encodedEvent, urlConfOption);
+            }else {
+                executeHttpClientWithProxy(encodedEvent, urlConfOption);
             }
         }
+    }
+
+    private void executeHttpClient(String encodedEvent, UrlConfigurationOption urlConfOption){
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            String requestBody = objectMapper
+                    .writeValueAsString(encodedEvent);
+
+            HttpClientContext clientContext = HttpClientContext.create();
+            switch (getHttpMethodFromConf(urlConfOption)) {
+                case "POST":
+                    ClassicHttpRequest httpPost = null;
+
+                    httpPost = ClassicRequestBuilder.post(urlConfOption.getUrl())
+                            .setEntity(requestBody)
+                            .build();
+
+                    if (getAuthTypeFromConf(urlConfOption).equals(AUTH_HTTP_BASIC)) {
+                        if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_HTTP_BASIC)) {
+                            String username = httpSinkConf.getAuthentication().getPluginSettings().get("username").toString();
+                            String password = httpSinkConf.getAuthentication().getPluginSettings().get("password").toString();
+                            String auth = getBasicAuthenticationHeader(username,password);
+                            httpPost.addHeader("Authorization ", auth);
+                        }
+                    }
+                    if (getAuthTypeFromConf(urlConfOption).equals(AUTH_BEARER_TOKEN)) {
+                        if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_BEARER_TOKEN)) {
+                            String token = httpSinkConf.getAuthentication().getPluginSettings().get("token").toString();
+                            httpPost.addHeader("Authorization", "Bearer " +token);
+                        }
+                    }
+                    CloseableHttpClient httpclient = HttpClients.custom()
+                            .setConnectionManager(authHandler.sslConnection())
+                            .build();
+
+                    LOG.info("  [MG]--> Request: " + httpPost);
+                    httpclient.execute(httpPost, clientContext, response -> {
+                        System.out.println(response.getCode() + " " + response.getReasonPhrase());
+                        final HttpEntity entity = response.getEntity();
+                        EntityUtils.consume(entity);
+                        SSLSession sslSession = clientContext.getSSLSession();
+                        if (sslSession != null) {
+                            LOG.info(" [MG]--> SSL Protocol : " + sslSession.getProtocol());
+                            LOG.info(" [MG]--> SSL Cipher Suit : " + sslSession.getCipherSuite());
+                        }
+                        return null;
+                    });
+                    break;
+            }
+        } catch (Exception e) {
+
+        }
+    }
+
+    private void executeHttpClientWithProxy(String encodedEvent, UrlConfigurationOption urlConfOption) throws MalformedURLException, URISyntaxException, JsonProcessingException {
+        LOG.info("________________ Execute Proxy _______________________");
+        URL targetUrl = new URL(urlConfOption.getUrl());
+        final HttpHost targetHost = new HttpHost(targetUrl.toURI().getScheme(), targetUrl.getHost(), targetUrl.getPort());
+        URL proxyUrl = new URL(urlConfOption.getUrl());
+        final HttpHost proxyHost = new HttpHost(proxyUrl.toURI().getScheme(), proxyUrl.getHost(), proxyUrl.getPort());
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        String requestBody = objectMapper
+                .writeValueAsString(encodedEvent);
+        try( final CloseableHttpClient httpClient = HttpClients.custom()
+                .setProxy(proxyHost)
+                .build()) {
+            RequestConfig config = RequestConfig.custom().build();
+          final ClassicHttpRequest httpPostRequest = ClassicRequestBuilder.post(urlConfOption.getUrl())
+                  .setEntity(requestBody)
+                  .build();
+
+            httpClient.execute(targetHost, httpPostRequest, response -> {
+                System.out.println(response.getCode() + " " + response.getReasonPhrase());
+                final HttpEntity entity = response.getEntity();
+                EntityUtils.consume(entity);
+                return null;
+            });
+
+        } catch (Exception e) {
+        }
+
     }
 }

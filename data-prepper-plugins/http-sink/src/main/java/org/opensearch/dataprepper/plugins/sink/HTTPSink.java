@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -81,11 +82,11 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         try {
             doInitializeInternal();
         } catch (InvalidPluginConfigurationException e) {
-            LOG.error("Invalid plugin configuration, Hence failed to initialize s3-sink plugin.");
+            LOG.error("Invalid plugin configuration, Hence failed to initialize http-sink plugin.");
             this.shutdown();
             throw e;
         } catch (Exception e) {
-            LOG.error("Failed to initialize s3-sink plugin.");
+            LOG.error("Failed to initialize http-sink plugin.");
             this.shutdown();
             throw e;
         }
@@ -114,7 +115,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             try {
                 encodedEvent = codec.parse(event);
                 service.sendHttpRequest(encodedEvent);
-            }catch (IOException | InterruptedException e) {
+            }catch (IOException | InterruptedException | URISyntaxException e) {
                 LOG.error("Exception while write event into buffer :", e);
             }
           //  reentrantLock.unlock();
