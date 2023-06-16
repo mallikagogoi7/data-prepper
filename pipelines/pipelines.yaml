@@ -4,9 +4,9 @@ log-pipeline:
   sink:
     - http:
         urls:
-        - url: "https://httpbin.org/post"
+        - url: "http://httpbin.org:443"
           workers: 1
-          proxy:
+          proxy: "http://localhost:8080"
           codec:
             ndjson:
           http_method: "POST"
@@ -20,8 +20,6 @@ log-pipeline:
           http_basic:
             username: "username"
             password: "vip"
-          bearer_token:
-            token: ""
         insecure: false
         ssl_certificate_file: "/full/path/to/certfile.crt"
         ssl_key_file: "/full/path/to/keyfile.key"

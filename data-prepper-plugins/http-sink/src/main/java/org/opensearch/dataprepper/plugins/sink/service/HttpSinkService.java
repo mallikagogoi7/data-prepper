@@ -8,7 +8,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
-import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -141,7 +140,7 @@ public class HttpSinkService {
 
                     LOG.info("  [MG]--> Request: " + httpPost);
                     httpclient.execute(httpPost, clientContext, response -> {
-                        System.out.println(response.getCode() + " " + response.getReasonPhrase());
+                        LOG.info("Http Response code : " + response.getCode());
                         final HttpEntity entity = response.getEntity();
                         EntityUtils.consume(entity);
                         SSLSession sslSession = clientContext.getSSLSession();
@@ -162,22 +161,25 @@ public class HttpSinkService {
         LOG.info("________________ Execute Proxy _______________________");
         URL targetUrl = new URL(urlConfOption.getUrl());
         final HttpHost targetHost = new HttpHost(targetUrl.toURI().getScheme(), targetUrl.getHost(), targetUrl.getPort());
-        URL proxyUrl = new URL(urlConfOption.getUrl());
+
+        URL proxyUrl = new URL(urlConfOption.getProxy());
         final HttpHost proxyHost = new HttpHost(proxyUrl.toURI().getScheme(), proxyUrl.getHost(), proxyUrl.getPort());
 
         ObjectMapper objectMapper = new ObjectMapper();
         String requestBody = objectMapper
                 .writeValueAsString(encodedEvent);
+
         try( final CloseableHttpClient httpClient = HttpClients.custom()
                 .setProxy(proxyHost)
                 .build()) {
-            RequestConfig config = RequestConfig.custom().build();
           final ClassicHttpRequest httpPostRequest = ClassicRequestBuilder.post(urlConfOption.getUrl())
                   .setEntity(requestBody)
                   .build();
 
             httpClient.execute(targetHost, httpPostRequest, response -> {
-                System.out.println(response.getCode() + " " + response.getReasonPhrase());
+                LOG.info("inside execute");
+                LOG.info("httpPostRequest : " + httpPostRequest);
+                LOG.info("Http Response code : " + response.getCode());
                 final HttpEntity entity = response.getEntity();
                 EntityUtils.consume(entity);
                 return null;
