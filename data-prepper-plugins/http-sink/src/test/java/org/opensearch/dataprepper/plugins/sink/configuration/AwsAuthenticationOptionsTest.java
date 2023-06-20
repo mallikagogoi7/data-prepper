@@ -2,6 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +20,7 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 class AwsAuthenticationOptionsTest {
+
     private ObjectMapper objectMapper = new ObjectMapper();
     @ParameterizedTest
     @ValueSource(strings = {"us-east-1", "us-west-2", "eu-central-1"})

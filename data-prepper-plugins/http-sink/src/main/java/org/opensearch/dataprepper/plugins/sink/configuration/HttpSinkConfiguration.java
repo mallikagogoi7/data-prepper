@@ -6,6 +6,8 @@ package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertFalse;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 
@@ -84,6 +86,11 @@ public class HttpSinkConfiguration {
 
     public String getHttpMethod() {
         return httpMethod;
+    }
+
+    @AssertFalse(message = "httpMethod will support only PUT / POST")
+    boolean isValidHttpMethod(){
+        return "PUT".equals(httpMethod) || "POST".equals(httpMethod);
     }
 
     public String getProxy() {
