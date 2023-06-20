@@ -8,8 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
-import org.opensearch.dataprepper.plugins.sink.accumulator.BufferTypeOptions;
-
 
 import java.util.List;
 
@@ -55,7 +53,8 @@ public class HttpSinkConfiguration {
     private boolean awsSigv4;
 
     @JsonProperty("buffer_type")
-    private BufferTypeOptions bufferType = BufferTypeOptions.INMEMORY;
+    //private BufferTypeOptions bufferType = BufferTypeOptions.INMEMORY;
+    private String  bufferType = "in_memory";  //TODO: change to BufferTypeOptions
 
     @JsonProperty("threshold")
     private ThresholdOptions thresholdOptions;
@@ -69,6 +68,11 @@ public class HttpSinkConfiguration {
 
     @JsonProperty("custom_header")
     private CustomHeaderOptions customHeaderOptions;
+
+    @JsonProperty("dlq_file")
+    private String dlqFile;
+
+    private PluginModel dlq;
 
     public List<UrlConfigurationOption> getUrlConfigurationOptions() {
         return urlConfigurationOptions;
@@ -110,7 +114,7 @@ public class HttpSinkConfiguration {
         return awsSigv4;
     }
 
-    public BufferTypeOptions getBufferType() {
+    public String getBufferType() {
         return bufferType;
     }
 
@@ -132,5 +136,13 @@ public class HttpSinkConfiguration {
 
     public Integer getWorkers() {
         return workers;
+    }
+
+    public String getDlqFile() {
+        return dlqFile;
+    }
+
+    public PluginModel getDlq() {
+        return dlq;
     }
 }

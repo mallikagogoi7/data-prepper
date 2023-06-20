@@ -6,7 +6,6 @@
 package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -21,13 +20,8 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 class AwsAuthenticationOptionsTest {
-    private ObjectMapper objectMapper;
 
-    @BeforeEach
-    void setUp() {
-        objectMapper = new ObjectMapper();
-    }
-
+    private ObjectMapper objectMapper = new ObjectMapper();
     @ParameterizedTest
     @ValueSource(strings = {"us-east-1", "us-west-2", "eu-central-1"})
     void getAwsRegion_returns_Region_of(final String regionString) {

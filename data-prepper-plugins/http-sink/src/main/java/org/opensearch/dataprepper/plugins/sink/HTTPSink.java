@@ -9,6 +9,8 @@ import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
+import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
+
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.plugin.InvalidPluginConfigurationException;
@@ -18,7 +20,6 @@ import org.opensearch.dataprepper.model.sink.AbstractSink;
 import org.opensearch.dataprepper.model.sink.Sink;
 
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.service.HttpSinkProxyService;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,8 +40,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     private final Codec codec;
 
     HttpSinkService service;
-
-    HttpSinkProxyService proxyService;
 
     private final BufferFactory bufferFactory;
 
@@ -69,7 +68,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         }
         authHandler = new AuthHandler();
         service = new HttpSinkService(codec,httpSinkConfiguration, bufferFactory, authHandler);
-        proxyService = new HttpSinkProxyService();
     }
 
     @Override
@@ -93,7 +91,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     }
 
     private void doInitializeInternal() {
-
         sinkInitialized = Boolean.TRUE;
     }
 
