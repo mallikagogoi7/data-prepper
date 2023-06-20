@@ -12,9 +12,7 @@ import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
-import org.apache.hc.core5.http.ClassicHttpRequest;
-import org.apache.hc.core5.http.HttpEntity;
-import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.*;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.plugins.sink.AuthHandler;
@@ -68,7 +66,8 @@ public class HttpSinkService {
     }
 
     public String getAuthTypeFromConf(UrlConfigurationOption urlConfOption) {
-        return urlConfOption.getAuthType()!=null? urlConfOption.getAuthType(): httpSinkConf.getAuthType();
+        String auth = urlConfOption.getAuthType()!=null? urlConfOption.getAuthType(): httpSinkConf.getAuthType();
+        return auth;
     }
 
     public String getProxyFromConf(UrlConfigurationOption urlConfOption) {
@@ -119,8 +118,9 @@ public class HttpSinkService {
                     httpPost = ClassicRequestBuilder.post(urlConfOption.getUrl())
                             .setEntity(requestBody)
                             .build();
+                    String authType = getAuthTypeFromConf(urlConfOption);
 
-                    if (getAuthTypeFromConf(urlConfOption).equals(AUTH_HTTP_BASIC)) {
+                    if (authType!= null &&  authType.equals(AUTH_HTTP_BASIC)) {
                         if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_HTTP_BASIC)) {
                             String username = httpSinkConf.getAuthentication().getPluginSettings().get("username").toString();
                             String password = httpSinkConf.getAuthentication().getPluginSettings().get("password").toString();
@@ -128,12 +128,13 @@ public class HttpSinkService {
                             httpPost.addHeader("Authorization ", auth);
                         }
                     }
-                    if (getAuthTypeFromConf(urlConfOption).equals(AUTH_BEARER_TOKEN)) {
+                    else if (authType!= null && authType.equals(AUTH_BEARER_TOKEN)) {
                         if (httpSinkConf.getAuthentication().getPluginName().equals(AUTH_BEARER_TOKEN)) {
                             String token = httpSinkConf.getAuthentication().getPluginSettings().get("token").toString();
                             httpPost.addHeader("Authorization", "Bearer " +token);
                         }
                     }
+                    httpPost.addHeader("Content-Type", "application/json");
                     CloseableHttpClient httpclient = HttpClients.custom()
                             .setConnectionManager(authHandler.sslConnection())
                             .build();
@@ -148,12 +149,13 @@ public class HttpSinkService {
                             LOG.info(" [MG]--> SSL Protocol : " + sslSession.getProtocol());
                             LOG.info(" [MG]--> SSL Cipher Suit : " + sslSession.getCipherSuite());
                         }
+                        LOG.info("Request Body: " +response.getEntity());
                         return null;
                     });
                     break;
             }
         } catch (Exception e) {
-
+            LOG.error("Error while calling Http Client " + e.getMessage());
         }
     }
 
@@ -187,6 +189,8 @@ public class HttpSinkService {
 
         } catch (Exception e) {
         }
+    }
 
+    private void executeHC(){
     }
 }
