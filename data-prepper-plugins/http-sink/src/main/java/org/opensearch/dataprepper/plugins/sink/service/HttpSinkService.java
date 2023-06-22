@@ -188,6 +188,7 @@ public class HttpSinkService {
             });
 
         } catch (Exception e) {
+            LOG.info("Exception in proxy: "+ e.getMessage());
         }
     }
 

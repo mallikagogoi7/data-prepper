@@ -66,7 +66,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         } else {
             bufferFactory = new InMemoryBufferFactory();
         }
-        authHandler = new AuthHandler();
+        authHandler = new AuthHandler(httpSinkConfiguration);
         service = new HttpSinkService(codec,httpSinkConfiguration, bufferFactory, authHandler);
     }
 

@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 
+import java.nio.file.Path;
 import java.util.List;
 
 public class HttpSinkConfiguration {
@@ -44,10 +45,10 @@ public class HttpSinkConfiguration {
     private boolean insecure;
 
     @JsonProperty("ssl_certificate_file")
-    private String sslCertificateFile;
+    private Path sslCertificateFile;
 
     @JsonProperty("ssl_key_file")
-    private String sslKeyFile;
+    private Path sslKeyFile;
 
     @JsonProperty("aws_sigv4")
     private boolean awsSigv4;
@@ -102,11 +103,11 @@ public class HttpSinkConfiguration {
         return insecure;
     }
 
-    public String getSslCertificateFile() {
+    public Path getSslCertificateFile() {
         return sslCertificateFile;
     }
 
-    public String getSslKeyFile() {
+    public Path getSslKeyFile() {
         return sslKeyFile;
     }
 
