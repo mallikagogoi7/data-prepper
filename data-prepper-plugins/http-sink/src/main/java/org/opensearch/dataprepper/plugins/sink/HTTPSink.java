@@ -5,7 +5,7 @@
 package org.opensearch.dataprepper.plugins.sink;
 
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.opensearch.dataprepper.plugins.sink.accumulator.*;
+import org.opensearch.dataprepper.plugins.accumulator.*;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @DataPrepperPlugin(name = "http", pluginType = Sink.class, pluginConfigurationType = HttpSinkConfiguration.class)
@@ -68,7 +69,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             bufferFactory = new InMemoryBufferFactory();
         }
 
-        final List<HttpAuthOptions> httpAuthOptions = getClassicHttpRequestList(httpSinkConfiguration.getUrlConfigurationOptions());
+        final Map<String,HttpAuthOptions> httpAuthOptions = getClassicHttpRequestList(httpSinkConfiguration.getUrlConfigurationOptions());
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration, bufferFactory,httpAuthOptions);
     }
 
@@ -128,13 +129,17 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         return Optional.empty();
     }
 
-    private List<HttpAuthOptions> getClassicHttpRequestList(final List<UrlConfigurationOption> urlConfigurationOption){
+    private Map<String,HttpAuthOptions> getClassicHttpRequestList(final List<UrlConfigurationOption> urlConfigurationOption){
         // logic for create auth handler for each url based on provided configuration - getAuthHandlerByConfig()
         // logic for request preparation for each url
         //logic for worker is not there in url level then verify the gloabl workers if global workers also not defined then default 1
         // logic for get the Proxy object if url level proxy enabled else look the global proxy.
+        //String proxy = urlConfOption.getProxy()!=null? urlConfOption.getProxy(): httpSinkConf.getProxy();
+
         // Aws SageMaker headers if headers found in the configuration
-        return List.of();
+
+
+        return null;
     }
 
 }

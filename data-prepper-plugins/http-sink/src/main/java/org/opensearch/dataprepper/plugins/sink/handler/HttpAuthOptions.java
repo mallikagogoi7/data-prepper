@@ -1,12 +1,16 @@
 package org.opensearch.dataprepper.plugins.sink.handler;
 
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 
 public class HttpAuthOptions {
     private String url;
     private CloseableHttpClient closeableHttpClient;
     private ClassicHttpRequest classicHttpRequest;
+
+    private HttpClientConnectionManager httpClientConnectionManager;
+
     private int workers;
     private String proxy;
 
@@ -53,5 +57,13 @@ public class HttpAuthOptions {
     public HttpAuthOptions setProxy(String proxy) {
         this.proxy = proxy;
         return this;
+    }
+
+    public HttpClientConnectionManager getHttpClientConnectionManager() {
+        return httpClientConnectionManager;
+    }
+
+    public void setHttpClientConnectionManager(HttpClientConnectionManager httpClientConnectionManager) {
+        this.httpClientConnectionManager = httpClientConnectionManager;
     }
 }

@@ -21,6 +21,8 @@ public class HttpSinkConfiguration {
 
     private static final int DEFAULT_WORKERS = 1;
 
+    private static final boolean DEFAULT_INSECURE = false;
+
     @NotNull
     @JsonProperty("urls")
     private List<UrlConfigurationOption> urlConfigurationOptions;
@@ -43,7 +45,7 @@ public class HttpSinkConfiguration {
     private PluginModel authentication;
 
     @JsonProperty("insecure")
-    private boolean insecure;
+    private boolean insecure = DEFAULT_INSECURE;
 
     @JsonProperty("ssl_certificate_file")
     private String sslCertificateFile;
