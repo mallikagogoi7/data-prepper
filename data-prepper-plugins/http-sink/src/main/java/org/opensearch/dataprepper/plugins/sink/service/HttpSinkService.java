@@ -28,6 +28,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class HttpSinkService {
 
@@ -43,6 +45,8 @@ public class HttpSinkService {
 
     private ExecutorService executorService;
 
+    private final Lock reentrantLock;
+
     public HttpSinkService(final Codec codec,
                            final HttpSinkConfiguration httpSinkConf,
                            final BufferFactory bufferFactory,
@@ -51,9 +55,11 @@ public class HttpSinkService {
         this.httpSinkConf = httpSinkConf;
         this.bufferFactory = bufferFactory;
         this.httpAuthOptions = httpAuthOptions;
+        reentrantLock = new ReentrantLock();
     }
 
     public void processRecords(Collection<Record<Event>> records) {
+        reentrantLock.lock();
         records.forEach(record -> {
             try{
                 // logic to fetch the records in batch as per threshold limit -  checkThresholdExceed();
@@ -85,6 +91,7 @@ public class HttpSinkService {
                 // In case of any exception, need to push the web hook url- logFailureForWebHook();
             }
         });
+        reentrantLock.unlock();
         //end to end ack
     }
 

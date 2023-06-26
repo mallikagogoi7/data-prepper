@@ -5,13 +5,17 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 
 public class HttpAuthOptions {
+
     private String url;
+
     private CloseableHttpClient closeableHttpClient;
+
     private ClassicHttpRequest classicHttpRequest;
 
     private HttpClientConnectionManager httpClientConnectionManager;
 
     private int workers;
+
     private String proxy;
 
     public CloseableHttpClient getCloseableHttpClient() {

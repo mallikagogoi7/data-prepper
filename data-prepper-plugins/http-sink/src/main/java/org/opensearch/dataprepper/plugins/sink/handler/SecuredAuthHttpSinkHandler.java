@@ -33,10 +33,16 @@ import java.util.Optional;
 
 public class SecuredAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
 
+    private final HttpSinkConfiguration sinkConfiguration;
+
+    public SecuredAuthHttpSinkHandler(final HttpSinkConfiguration sinkConfiguration){
+        this.sinkConfiguration = sinkConfiguration;
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(SecuredAuthHttpSinkHandler.class);
 
     @Override
-    public HttpAuthOptions authenticate(final HttpSinkConfiguration sinkConfiguration, final UrlConfigurationOption urlConfigurationOption, final HttpAuthOptions httpAuthOptions) throws Exception {
+    public HttpAuthOptions authenticate(final HttpAuthOptions httpAuthOptions) {
 
         // logic here to read the certs from ACM/S3/local
         // SSL Sigv4 validation and verification and make connection

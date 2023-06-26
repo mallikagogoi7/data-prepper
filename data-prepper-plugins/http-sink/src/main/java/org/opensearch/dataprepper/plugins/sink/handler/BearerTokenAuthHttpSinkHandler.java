@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public class BearerTokenAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
     @Override
-    public HttpAuthOptions authenticate(final HttpSinkConfiguration sinkConfiguration, final UrlConfigurationOption urlConfigurationOption, final HttpAuthOptions httpAuthOptions) throws Exception {
+    public HttpAuthOptions authenticate(final HttpAuthOptions httpAuthOptions) {
         // if ssl enabled then set connection manager
         return null;
     }

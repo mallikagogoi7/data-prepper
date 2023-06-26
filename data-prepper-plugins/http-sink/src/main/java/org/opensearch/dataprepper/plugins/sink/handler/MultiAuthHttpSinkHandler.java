@@ -6,6 +6,6 @@ import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOpt
 import java.util.Optional;
 
 public interface MultiAuthHttpSinkHandler {
-    HttpAuthOptions authenticate(final HttpSinkConfiguration sinkConfiguration, final UrlConfigurationOption urlConfigurationOption, final HttpAuthOptions httpAuthOptions) throws Exception;
+    HttpAuthOptions authenticate(final HttpAuthOptions  authOptions);
 
 }
