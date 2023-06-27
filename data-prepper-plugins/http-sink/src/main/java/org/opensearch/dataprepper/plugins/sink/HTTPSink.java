@@ -4,7 +4,8 @@
  */
 package org.opensearch.dataprepper.plugins.sink;
 
-import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
@@ -21,6 +22,8 @@ import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
+import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
+import org.opensearch.dataprepper.plugins.sink.certificate.SSLAuthentication;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
@@ -29,7 +32,6 @@ import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.handler.HttpAuthOptions;
 import org.opensearch.dataprepper.plugins.sink.handler.MultiAuthHttpSinkHandler;
-import org.opensearch.dataprepper.plugins.sink.handler.SecuredAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +41,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 
 @DataPrepperPlugin(name = "http", pluginType = Sink.class, pluginConfigurationType = HttpSinkConfiguration.class)
 public class HTTPSink extends AbstractSink<Record<Event>> {
@@ -56,6 +57,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     public static final String HTTP_BASIC = "http_basic";
     public static final String BEARER_TOKEN = "bearer_token";
     public static final String MTLS = "mtls";
+    public static final String UNAUTHENTICATED = "unauthenticated";
 
     private final HttpSinkConfiguration httpSinkConfiguration;
 
@@ -69,7 +71,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private Buffer currentBuffer;
 
-
+    private final CertificateProviderFactory certificateProviderFactory;
 
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
@@ -87,7 +89,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         } else {
             bufferFactory = new InMemoryBufferFactory();
         }
-
+        this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
                 bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration));
     }
@@ -129,18 +131,22 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private HttpAuthOptions getAuthHandlerByConfig(final String authType,
                                                    final HttpAuthOptions authOptions){
+        HttpClientConnectionManager httpClientConnectionManager = null;
+        if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
+            httpClientConnectionManager = new SSLAuthentication(httpSinkConfiguration, certificateProviderFactory).createSslContext();
+        }
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
-        // AWS Sigv4 - check
+        // TODO: AWS Sigv4 - check
         switch(authType){
             case HTTP_BASIC:
-                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration);
+                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
                 break;
             case BEARER_TOKEN:
-                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler();
+                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(httpClientConnectionManager);
                 break;
-            case MTLS:
-                multiAuthHttpSinkHandler = new SecuredAuthHttpSinkHandler(httpSinkConfiguration);
-                break;
+            case UNAUTHENTICATED:
+            default:
+                return authOptions.setCloseableHttpClient(HttpClients.createMinimal());
         }
         return multiAuthHttpSinkHandler.authenticate(authOptions);
     }
@@ -155,14 +161,14 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             final String authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
             final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
 
-            final ClassicHttpRequest classicHttpRequest = buildRequestByHTTPMethodType(httpMethodString).setUri(urlOption.getUrl()).build();
+            final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethodString).setUri(urlOption.getUrl());
 
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
-                addSageMakerHeaders(classicHttpRequest,httpSinkConfiguration.getCustomHeaderOptions());
+                addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
 
             authOptions.setUrl(urlOption.getUrl());
             authOptions.setProxy(proxyUrlString);
-            authOptions.setClassicHttpRequest(classicHttpRequest);
+            authOptions.setClassicHttpRequestBuilder(classicRequestBuilder);
 
             authMap.put(urlOption.getUrl(),getAuthHandlerByConfig(authType,authOptions));
         });
@@ -170,17 +176,17 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     }
 
-    private void addSageMakerHeaders(ClassicHttpRequest classicHttpRequest,
+    private void addSageMakerHeaders(final ClassicRequestBuilder classicRequestBuilder,
                                                final CustomHeaderOptions customHeaderOptions) {
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES,customHeaderOptions.getCustomAttributes());
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_INFERENCE_ID,customHeaderOptions.getInferenceId());
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_ENABLE_EXPLANATIONS,customHeaderOptions.getEnableExplanations());
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_TARGET_VARIANT,customHeaderOptions.getTargetVariant());
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_TARGET_MODEL,customHeaderOptions.getTargetModel());
-        classicHttpRequest.addHeader(X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME,customHeaderOptions.getTargetContainerHostname());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES,customHeaderOptions.getCustomAttributes());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_INFERENCE_ID,customHeaderOptions.getInferenceId());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_ENABLE_EXPLANATIONS,customHeaderOptions.getEnableExplanations());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_VARIANT,customHeaderOptions.getTargetVariant());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_MODEL,customHeaderOptions.getTargetModel());
+        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME,customHeaderOptions.getTargetContainerHostname());
     }
 
-    private ClassicRequestBuilder buildRequestByHTTPMethodType(String httpMethod) {
+    private ClassicRequestBuilder buildRequestByHTTPMethodType(final String httpMethod) {
         final ClassicRequestBuilder classicRequestBuilder;
         switch(httpMethod){
             case PUT:

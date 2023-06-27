@@ -5,6 +5,7 @@ import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.HttpHost;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 
@@ -16,8 +17,12 @@ public class BasicAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
 
     private final HttpSinkConfiguration sinkConfiguration;
 
-    public BasicAuthHttpSinkHandler(final HttpSinkConfiguration sinkConfiguration){
+    private final HttpClientConnectionManager httpClientConnectionManager;
+
+    public BasicAuthHttpSinkHandler(final HttpSinkConfiguration sinkConfiguration,
+                                    final HttpClientConnectionManager httpClientConnectionManager ){
         this.sinkConfiguration = sinkConfiguration;
+        this.httpClientConnectionManager = httpClientConnectionManager;
     }
 
     @Override
@@ -41,17 +46,9 @@ public class BasicAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
         final BasicCredentialsProvider provider = new BasicCredentialsProvider();
         AuthScope authScope = new AuthScope(targetHost);
         provider.setCredentials(authScope, new UsernamePasswordCredentials(username, password.toCharArray()));
-        if(sinkConfiguration.isInsecure()){
-            httpclient = HttpClients.custom()
-                    .setDefaultCredentialsProvider(provider)
-                    .build();
-
-        }else{
-            httpclient = HttpClients.custom()
-                    .setConnectionManager(authOptions.getHttpClientConnectionManager())
-                    .setDefaultCredentialsProvider(provider)
-                    .build();
-        }
+        httpclient = HttpClients.custom()
+                .setConnectionManager(httpClientConnectionManager)
+                .setDefaultCredentialsProvider(provider).build();
         authOptions.setCloseableHttpClient(httpclient);
         return authOptions;
     }

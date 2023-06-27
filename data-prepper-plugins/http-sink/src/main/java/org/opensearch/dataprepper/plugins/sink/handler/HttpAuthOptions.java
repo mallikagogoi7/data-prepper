@@ -3,6 +3,7 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 
 public class HttpAuthOptions {
 
@@ -10,7 +11,7 @@ public class HttpAuthOptions {
 
     private CloseableHttpClient closeableHttpClient;
 
-    private ClassicHttpRequest classicHttpRequest;
+    private ClassicRequestBuilder classicHttpRequestBuilder;
 
     private HttpClientConnectionManager httpClientConnectionManager;
 
@@ -27,12 +28,12 @@ public class HttpAuthOptions {
         return this;
     }
 
-    public ClassicHttpRequest getClassicHttpRequest() {
-        return classicHttpRequest;
+    public ClassicRequestBuilder getClassicHttpRequestBuilder() {
+        return classicHttpRequestBuilder;
     }
 
-    public HttpAuthOptions setClassicHttpRequest(ClassicHttpRequest classicHttpRequest) {
-        this.classicHttpRequest = classicHttpRequest;
+    public HttpAuthOptions setClassicHttpRequestBuilder(ClassicRequestBuilder classicHttpRequestBuilder) {
+        this.classicHttpRequestBuilder = classicHttpRequestBuilder;
         return this;
     }
 

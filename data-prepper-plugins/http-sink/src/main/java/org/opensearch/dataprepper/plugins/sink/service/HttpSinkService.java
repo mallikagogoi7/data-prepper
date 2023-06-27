@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.BasicHttpEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.model.event.Event;
@@ -63,20 +64,14 @@ public class HttpSinkService {
         records.forEach(record -> {
             try{
                 // logic to fetch the records in batch as per threshold limit -  checkThresholdExceed();
-                // apply the codec
-                // push to http end point based on workers - Callable<>
                 final Event event = record.getData();
-                final String encodedEvent = codec.parse(event);
                 for(UrlConfigurationOption urlConfOption: httpSinkConf.getUrlConfigurationOptions()) {
-
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    String requestBody = objectMapper
-                            .writeValueAsString(encodedEvent);
                     HttpClientContext clientContext = HttpClientContext.create();
-                    ClassicHttpRequest httpPost = ClassicRequestBuilder.post(urlConfOption.getUrl())
-                            .setEntity(requestBody)
-                            .build();
-                    httpAuthOptions.get(urlConfOption.getUrl()).getCloseableHttpClient().execute(httpPost, clientContext, response -> {
+                    final ClassicRequestBuilder classicHttpRequestBuilder =
+                            httpAuthOptions.get(urlConfOption.getUrl()).getClassicHttpRequestBuilder();
+                    classicHttpRequestBuilder.setEntity(codec.parse(event));
+                    httpAuthOptions.get(urlConfOption.getUrl()).getCloseableHttpClient()
+                            .execute(classicHttpRequestBuilder.build(), clientContext, response -> {
                         LOG.info("Http Response code : " + response.getCode());
                         final HttpEntity entity = response.getEntity();
                         EntityUtils.consume(entity);
@@ -85,14 +80,12 @@ public class HttpSinkService {
                     });
 
                 }
-
             }catch(Exception e){
                 // In case of any exception, need to write the exception in dlq  - logFailureForDlqObjects();
                 // In case of any exception, need to push the web hook url- logFailureForWebHook();
             }
         });
         reentrantLock.unlock();
-        //end to end ack
     }
 
     public static boolean checkThresholdExceed(final Buffer currentBuffer,

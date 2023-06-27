@@ -1,4 +1,4 @@
-package org.opensearch.dataprepper.plugins.sink.handler;
+package org.opensearch.dataprepper.plugins.sink.certificate;
 
 import org.apache.hc.client5.http.config.TlsConfig;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
@@ -11,68 +11,54 @@ import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.hc.core5.ssl.TrustStrategy;
 import org.apache.hc.core5.util.Timeout;
-import org.opensearch.dataprepper.plugins.certificate.s3.S3CertificateProvider;
+import org.opensearch.dataprepper.plugins.certificate.CertificateProvider;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
-import software.amazon.awssdk.services.s3.S3Client;
 
 import javax.net.ssl.SSLContext;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
-import java.util.Optional;
 
-public class SecuredAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
+public class SSLAuthentication {
 
     private final HttpSinkConfiguration sinkConfiguration;
 
-    public SecuredAuthHttpSinkHandler(final HttpSinkConfiguration sinkConfiguration){
+    private final CertificateProviderFactory providerFactory;
+
+    public SSLAuthentication(final HttpSinkConfiguration sinkConfiguration,
+                                      final CertificateProviderFactory providerFactory){
         this.sinkConfiguration = sinkConfiguration;
+        this.providerFactory = providerFactory;
     }
 
-    private static final Logger LOG = LoggerFactory.getLogger(SecuredAuthHttpSinkHandler.class);
 
-    @Override
-    public HttpAuthOptions authenticate(final HttpAuthOptions httpAuthOptions) {
-
-        // logic here to read the certs from ACM/S3/local
-        // SSL Sigv4 validation and verification and make connection
-
-        final SSLContext sslContext = sinkConfiguration.getSslCertificateFile() != null ? getCAStrategy(Path.of(sinkConfiguration.getSslCertificateFile())) : getTrustAllStrategy();
-
+    public HttpClientConnectionManager createSslContext(){
+        final CertificateProvider certificateProvider = providerFactory.getCertificateProvider();
+        final org.opensearch.dataprepper.plugins.certificate.model.Certificate certificate = certificateProvider.getCertificate();
+        final SSLContext sslContext = sinkConfiguration.getSslCertificateFile() != null ?
+                getCAStrategy(new ByteArrayInputStream(certificate.getCertificate().getBytes(StandardCharsets.UTF_8))) : getTrustAllStrategy();
         SSLConnectionSocketFactory sslSocketFactory = SSLConnectionSocketFactoryBuilder.create()
                 .setSslContext(sslContext)
                 .build();
-
-        HttpClientConnectionManager clientConnectionManager =  PoolingHttpClientConnectionManagerBuilder.create()
+       return PoolingHttpClientConnectionManagerBuilder.create()
                 .setSSLSocketFactory(sslSocketFactory)
                 .setDefaultTlsConfig(TlsConfig.custom()
                         .setHandshakeTimeout(Timeout.ofSeconds(30))
                         .setSupportedProtocols(TLS.V_1_3)
                         .build())
                 .build();
-
-        httpAuthOptions.setHttpClientConnectionManager(clientConnectionManager);
-        return httpAuthOptions;
     }
 
-    private SSLContext getCAStrategy(Path certPath) {
-        LOG.info("Using the cert provided in the config.");
+
+
+    private SSLContext getCAStrategy(final InputStream cert) {
         try {
             CertificateFactory factory = CertificateFactory.getInstance("X.509");
             Certificate trustedCa;
-            try (InputStream is = Files.newInputStream(certPath)) {
-                trustedCa = factory.generateCertificate(is);
-            }
+            trustedCa = factory.generateCertificate(cert);
             KeyStore trustStore = KeyStore.getInstance("pkcs12");
             trustStore.load(null, null);
             trustStore.setCertificateEntry("ca", trustedCa);
@@ -85,7 +71,6 @@ public class SecuredAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
     }
 
     private SSLContext getTrustAllStrategy() {
-        LOG.info("Using the trust all strategy");
         final TrustStrategy trustStrategy = new TrustAllStrategy();
         try {
             return SSLContexts.custom().loadTrustMaterial(null, trustStrategy).build();
