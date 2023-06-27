@@ -4,22 +4,23 @@
  */
 package org.opensearch.dataprepper.plugins.sink.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
-import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpEntity;
-import org.apache.hc.core5.http.io.entity.BasicHttpEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
+import org.opensearch.dataprepper.model.event.EventHandle;
 import org.opensearch.dataprepper.model.failures.DlqObject;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.types.ByteCount;
 import org.opensearch.dataprepper.plugins.accumulator.Buffer;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
+import org.opensearch.dataprepper.plugins.sink.DLQSink;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
+import org.opensearch.dataprepper.plugins.sink.dlq.FailedDlqData;
 import org.opensearch.dataprepper.plugins.sink.handler.HttpAuthOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,10 @@ public class HttpSinkService {
 
     private final Map<String,HttpAuthOptions> httpAuthOptions;
 
+    private final DLQSink dlqSink;
+
+    private final PluginSetting pluginSetting;
+
     private ExecutorService executorService;
 
     private final Lock reentrantLock;
@@ -51,11 +56,15 @@ public class HttpSinkService {
     public HttpSinkService(final Codec codec,
                            final HttpSinkConfiguration httpSinkConf,
                            final BufferFactory bufferFactory,
-                           final Map<String, HttpAuthOptions> httpAuthOptions){
+                           final Map<String, HttpAuthOptions> httpAuthOptions,
+                           final DLQSink dlqSink,
+                           final PluginSetting pluginSetting){
         this.codec= codec;
         this.httpSinkConf = httpSinkConf;
         this.bufferFactory = bufferFactory;
         this.httpAuthOptions = httpAuthOptions;
+        this.dlqSink = dlqSink;
+        this.pluginSetting = pluginSetting;
         reentrantLock = new ReentrantLock();
     }
 
@@ -81,6 +90,7 @@ public class HttpSinkService {
 
                 }
             }catch(Exception e){
+
                 // In case of any exception, need to write the exception in dlq  - logFailureForDlqObjects();
                 // In case of any exception, need to push the web hook url- logFailureForWebHook();
             }
@@ -97,7 +107,7 @@ public class HttpSinkService {
     }
 
     private void logFailureForDlqObjects(final List<DlqObject> dlqObjects, final Throwable failure){
-        // logic for writing failure objects into dlq ( local file / s3)
+        dlqSink.perform(pluginSetting,new FailedDlqData(0, "status", null));
     }
 
     private void logFailureForWebHook(final String message, final Throwable failure,final String url){

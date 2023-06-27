@@ -14,7 +14,7 @@ public class FailedDlqData {
     @JsonIgnore
     private final EventHandle eventHandle;
 
-    private FailedDlqData(final int status,
+    public FailedDlqData(final int status,
                           final String message,
                           final EventHandle eventHandle) {
         this.status = status;

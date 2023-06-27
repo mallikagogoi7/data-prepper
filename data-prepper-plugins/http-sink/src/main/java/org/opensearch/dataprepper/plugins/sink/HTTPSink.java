@@ -73,6 +73,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private final CertificateProviderFactory certificateProviderFactory;
 
+    private final DLQSink dlqSink;
+
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
                     final HttpSinkConfiguration httpSinkConfiguration,
@@ -90,8 +92,9 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             bufferFactory = new InMemoryBufferFactory();
         }
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
+        this.dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
-                bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration));
+                bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration), dlqSink, codecPluginSettings);
     }
 
     @Override
