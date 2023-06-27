@@ -10,6 +10,7 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.Buffer;
+import org.opensearch.dataprepper.model.configuration.PipelineDescription;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
@@ -78,12 +79,14 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
                     final HttpSinkConfiguration httpSinkConfiguration,
-                    final PluginFactory pluginFactory) {
+                    final PluginFactory pluginFactory,
+                    final PipelineDescription pipelineDescription) {
         super(pluginSetting);
         this.httpSinkConfiguration = httpSinkConfiguration;
         final PluginModel codecConfiguration = httpSinkConfiguration.getCodec();
         final PluginSetting codecPluginSettings = new PluginSetting(codecConfiguration.getPluginName(),
                 codecConfiguration.getPluginSettings());
+        codecPluginSettings.setPipelineName(pipelineDescription.getPipelineName());
         codec = pluginFactory.loadPlugin(Codec.class, codecPluginSettings);
         sinkInitialized = Boolean.FALSE;
         if (httpSinkConfiguration.getBufferType().equals(BufferTypeOptions.LOCALFILE)) {
@@ -92,7 +95,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             bufferFactory = new InMemoryBufferFactory();
         }
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
-        this.dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
+        httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
+        dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
                 bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration), dlqSink, codecPluginSettings);
     }

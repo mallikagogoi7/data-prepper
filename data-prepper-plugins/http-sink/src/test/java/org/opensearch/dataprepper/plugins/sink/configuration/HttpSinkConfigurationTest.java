@@ -103,7 +103,7 @@ public class HttpSinkConfigurationTest {
 
     @Test
     void default_insecure_test() {
-        assertThat(new HttpSinkConfiguration().isInsecure(), equalTo(false));
+        assertThat(new HttpSinkConfiguration().isSsl(), equalTo(false));
     }
 
     @Test
