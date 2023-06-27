@@ -6,8 +6,6 @@ package org.opensearch.dataprepper.plugins.sink.configuration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.AssertFalse;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
@@ -22,9 +20,7 @@ public class HttpSinkConfiguration {
 
     private static final int DEFAULT_WORKERS = 1;
 
-    private static final boolean DEFAULT_INSECURE = false;
-
-    static final boolean DEFAULT_SSL = true;
+    static final boolean DEFAULT_SSL = false;
 
     private static final String S3_PREFIX = "s3://";
 
@@ -63,9 +59,6 @@ public class HttpSinkConfiguration {
     private String authType;
 
     private PluginModel authentication;
-
-    @JsonProperty("insecure")
-    private boolean insecure = DEFAULT_INSECURE;
 
     @JsonProperty("ssl_certificate_file")
     private String sslCertificateFile;
@@ -191,10 +184,6 @@ public class HttpSinkConfiguration {
 
     public PluginModel getAuthentication() {
         return authentication;
-    }
-
-    public boolean isInsecure() {
-        return insecure;
     }
 
     public String getSslCertificateFile() {
