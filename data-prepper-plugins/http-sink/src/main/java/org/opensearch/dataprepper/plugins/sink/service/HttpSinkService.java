@@ -10,8 +10,6 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
-import org.opensearch.dataprepper.model.event.EventHandle;
-import org.opensearch.dataprepper.model.failures.DlqObject;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.types.ByteCount;
 import org.opensearch.dataprepper.plugins.accumulator.Buffer;
@@ -25,11 +23,10 @@ import org.opensearch.dataprepper.plugins.sink.handler.HttpAuthOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLSession;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -70,6 +67,7 @@ public class HttpSinkService {
 
     public void processRecords(Collection<Record<Event>> records) {
         reentrantLock.lock();
+        AtomicInteger responseCode = new AtomicInteger();
         records.forEach(record -> {
             try{
                 // logic to fetch the records in batch as per threshold limit -  checkThresholdExceed();
@@ -82,6 +80,7 @@ public class HttpSinkService {
                     httpAuthOptions.get(urlConfOption.getUrl()).getCloseableHttpClient()
                             .execute(classicHttpRequestBuilder.build(), clientContext, response -> {
                         LOG.info("Http Response code : " + response.getCode());
+                        responseCode.set(response.getCode());
                         final HttpEntity entity = response.getEntity();
                         EntityUtils.consume(entity);
                         LOG.info("Request Body: " +response.getEntity());
@@ -90,7 +89,8 @@ public class HttpSinkService {
 
                 }
             }catch(Exception e){
-
+                FailedDlqData failedDlqData = new FailedDlqData(responseCode.get(), e.getMessage(), record.getData().getEventHandle());
+                logFailureForDlqObjects(failedDlqData);
                 // In case of any exception, need to write the exception in dlq  - logFailureForDlqObjects();
                 // In case of any exception, need to push the web hook url- logFailureForWebHook();
             }
@@ -106,8 +106,8 @@ public class HttpSinkService {
         return true;
     }
 
-    private void logFailureForDlqObjects(final List<DlqObject> dlqObjects, final Throwable failure){
-        dlqSink.perform(pluginSetting,new FailedDlqData(0, "status", null));
+    private void logFailureForDlqObjects(final FailedDlqData failedDlqData){
+            dlqSink.perform(pluginSetting, failedDlqData);
     }
 
     private void logFailureForWebHook(final String message, final Throwable failure,final String url){

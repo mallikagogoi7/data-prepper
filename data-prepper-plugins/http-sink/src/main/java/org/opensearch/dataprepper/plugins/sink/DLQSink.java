@@ -65,8 +65,8 @@ public class DLQSink {
     private  DlqProvider getDlqProvider(final PluginFactory pluginFactory, final HttpSinkConfiguration httpSinkConfiguration) {
         final Map<String, Object> props = new HashMap<>();
         props.put(BUCKET, httpSinkConfiguration.getDlq().getPluginSettings().get("bucket"));
-        props.put(ROLE_ARN, httpSinkConfiguration.getAuthentication().getPluginSettings().get("sts_role_arn"));
-        props.put(REGION, httpSinkConfiguration.getAuthentication().getPluginSettings().get("region"));
+        props.put(ROLE_ARN, httpSinkConfiguration.getAwsAuthenticationOptions().getAwsStsRoleArn());
+        props.put(REGION, httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion());
         final PluginSetting dlqPluginSetting = new PluginSetting(S3_PLUGIN_NAME, props);
         DlqProvider dlqProvider = pluginFactory.loadPlugin(DlqProvider.class, dlqPluginSetting);
         return dlqProvider;
