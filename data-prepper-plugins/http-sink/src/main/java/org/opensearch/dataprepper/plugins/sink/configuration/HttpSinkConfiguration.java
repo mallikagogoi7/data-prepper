@@ -16,8 +16,6 @@ public class HttpSinkConfiguration {
 
     private static final int DEFAULT_UPLOAD_RETRIES = 5;
 
-    private static final String DEFAULT_HTTP_METHOD = "POST";
-
     private static final int DEFAULT_WORKERS = 1;
 
     static final boolean DEFAULT_SSL = false;
@@ -26,18 +24,11 @@ public class HttpSinkConfiguration {
 
     static final String SSL_KEY_CERT_FILE = "sslKeyCertChainFile";
     static final String SSL_KEY_FILE = "sslKeyFile";
-    static final String ACM_CERT_ARN = "acmCertificateArn";
-    static final String ACM_PRIVATE_KEY_PASSWORD = "acmPrivateKeyPassword";
-    static final String ACM_CERT_ISSUE_TIME_OUT_MILLIS = "acmCertIssueTimeOutMillis";
-    static final String PATH = "path";
     static final String SSL = "ssl";
-    static final String USE_ACM_CERT_FOR_SSL = "useAcmCertForSSL";
-
     static final String AWS_REGION = "awsRegion";
-
     static final boolean DEFAULT_USE_ACM_CERT_FOR_SSL = false;
-
     static final int DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS = 120000;
+    public static final String SSL_IS_ENABLED = "%s is enabled";
 
     @NotNull
     @JsonProperty("urls")
@@ -50,14 +41,15 @@ public class HttpSinkConfiguration {
     private PluginModel codec;
 
     @JsonProperty("http_method")
-    private String httpMethod = DEFAULT_HTTP_METHOD;
+    private HTTPMethodOptions httpMethod = HTTPMethodOptions.POST;
 
     @JsonProperty("proxy")
     private String proxy;
 
     @JsonProperty("auth_type")
-    private String authType;
+    private AuthTypeOptions authType = AuthTypeOptions.UNAUTHENTICATED;
 
+    @JsonProperty("authentication")
     private PluginModel authentication;
 
     @JsonProperty("ssl_certificate_file")
@@ -70,8 +62,7 @@ public class HttpSinkConfiguration {
     private boolean awsSigv4;
 
     @JsonProperty("buffer_type")
-    //private BufferTypeOptions bufferType = BufferTypeOptions.INMEMORY;
-    private String  bufferType = "in_memory";  //TODO: change to BufferTypeOptions
+    private BufferTypeOptions bufferType = BufferTypeOptions.IN_MEMORY;
 
     @JsonProperty("threshold")
     private ThresholdOptions thresholdOptions;
@@ -92,21 +83,22 @@ public class HttpSinkConfiguration {
     @JsonProperty("webhook_url")
     private String webhookURL;
 
+    @JsonProperty("dlq")
     private PluginModel dlq;
 
-    @JsonProperty(USE_ACM_CERT_FOR_SSL)
+    @JsonProperty("use_acm_cert_for_ssl")
     private boolean useAcmCertForSSL = DEFAULT_USE_ACM_CERT_FOR_SSL;
 
-    @JsonProperty(ACM_PRIVATE_KEY_PASSWORD)
+    @JsonProperty("acm_private_key_password")
     private String acmPrivateKeyPassword;
 
-    @JsonProperty(ACM_CERT_ARN)
+    @JsonProperty("acm_certificate_arn")
     private String acmCertificateArn;
 
-    @JsonProperty(ACM_CERT_ISSUE_TIME_OUT_MILLIS)
+    @JsonProperty("acm_cert_issue_time_out_millis")
     private long acmCertIssueTimeOutMillis = DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS;
 
-    @JsonProperty(SSL)
+    @JsonProperty("ssl")
     private boolean ssl = DEFAULT_SSL;
 
     private boolean sslCertAndKeyFileInS3;
@@ -138,8 +130,8 @@ public class HttpSinkConfiguration {
     public void validateAndInitializeCertAndKeyFileInS3() {
         boolean certAndKeyFileInS3 = false;
         if (useAcmCertForSSL) {
-            validateSSLArgument(String.format("%s is enabled", USE_ACM_CERT_FOR_SSL), acmCertificateArn, ACM_CERT_ARN);
-            validateSSLArgument(String.format("%s is enabled", USE_ACM_CERT_FOR_SSL), awsAuthenticationOptions.getAwsRegion().toString(), AWS_REGION);
+            validateSSLArgument(String.format(SSL_IS_ENABLED, useAcmCertForSSL), acmCertificateArn, acmCertificateArn);
+            validateSSLArgument(String.format(SSL_IS_ENABLED, useAcmCertForSSL), awsAuthenticationOptions.getAwsRegion().toString(), AWS_REGION);
         } else if(ssl) {
             validateSSLCertificateFiles();
             certAndKeyFileInS3 = isSSLCertificateLocatedInS3();
@@ -156,8 +148,8 @@ public class HttpSinkConfiguration {
     }
 
     private void validateSSLCertificateFiles() {
-        validateSSLArgument(String.format("%s is enabled", SSL), sslCertificateFile, SSL_KEY_CERT_FILE);
-        validateSSLArgument(String.format("%s is enabled", SSL), sslKeyFile, SSL_KEY_FILE);
+        validateSSLArgument(String.format(SSL_IS_ENABLED, SSL), sslCertificateFile, SSL_KEY_CERT_FILE);
+        validateSSLArgument(String.format(SSL_IS_ENABLED, SSL), sslKeyFile, SSL_KEY_FILE);
     }
 
     private boolean isSSLCertificateLocatedInS3() {
@@ -177,7 +169,7 @@ public class HttpSinkConfiguration {
         return codec;
     }
 
-    public String getHttpMethod() {
+    public HTTPMethodOptions getHttpMethod() {
         return httpMethod;
     }
 
@@ -185,7 +177,7 @@ public class HttpSinkConfiguration {
         return proxy;
     }
 
-    public String getAuthType() {
+    public AuthTypeOptions getAuthType() {
         return authType;
     }
 
@@ -205,7 +197,7 @@ public class HttpSinkConfiguration {
         return awsSigv4;
     }
 
-    public String getBufferType() {
+    public BufferTypeOptions getBufferType() {
         return bufferType;
     }
 

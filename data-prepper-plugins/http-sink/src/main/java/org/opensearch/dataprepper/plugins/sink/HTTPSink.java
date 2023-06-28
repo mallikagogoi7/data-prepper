@@ -31,7 +31,9 @@ import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
+import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
+import org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
 import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
@@ -49,6 +51,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions.*;
+import static org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions.*;
 
 @DataPrepperPlugin(name = "http", pluginType = Sink.class, pluginConfigurationType = HttpSinkConfiguration.class)
 public class HTTPSink extends AbstractSink<Record<Event>> {
@@ -72,16 +77,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     public static final String X_AMZN_SAGE_MAKER_TARGET_MODEL = "X-Amzn-SageMaker-Target-Model";
 
     public static final String X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME = "X-Amzn-SageMaker-Target-Container-Hostname";
-
-    public static final String PUT = "PUT";
-
-    public static final String POST = "POST";
-
-    public static final String HTTP_BASIC = "http_basic";
-
-    public static final String BEARER_TOKEN = "bearer_token";
-
-    public static final String UNAUTHENTICATED = "unauthenticated";
 
     public static final int HTTP_MAX_RETRIES = 5;
 
@@ -190,7 +185,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         httpSinkService.processRecords(records);
     }
 
-    private HttpAuthOptions getAuthHandlerByConfig(final String authType,
+    private HttpAuthOptions getAuthHandlerByConfig(final AuthTypeOptions authType,
                                                    final HttpAuthOptions.Builder authOptions){
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
         // TODO: AWS Sigv4 - check
@@ -213,10 +208,10 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         final List<UrlConfigurationOption> urlConfigurationOptions = httpSinkConfiguration.getUrlConfigurationOptions();
         final Map<String,HttpAuthOptions> authMap = new HashMap<>(urlConfigurationOptions.size());
         urlConfigurationOptions.forEach( urlOption -> {
-            final String httpMethodString = Objects.nonNull(urlOption.getHttpMethod()) ? urlOption.getHttpMethod() : httpSinkConfiguration.getHttpMethod();
-            final String authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
+            final HTTPMethodOptions httpMethod = Objects.nonNull(urlOption.getHttpMethod()) ? urlOption.getHttpMethod() : httpSinkConfiguration.getHttpMethod();
+            final AuthTypeOptions authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
             final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
-            final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethodString).setUri(urlOption.getUrl());
+            final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethod).setUri(urlOption.getUrl());
 
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
                 addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
@@ -241,9 +236,9 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME,customHeaderOptions.getTargetContainerHostname());
     }
 
-    private ClassicRequestBuilder buildRequestByHTTPMethodType(final String httpMethod) {
+    private ClassicRequestBuilder buildRequestByHTTPMethodType(final HTTPMethodOptions httpMethodOptions) {
         final ClassicRequestBuilder classicRequestBuilder;
-        switch(httpMethod){
+        switch(httpMethodOptions){
             case PUT:
                 classicRequestBuilder = ClassicRequestBuilder.put();
                 break;
