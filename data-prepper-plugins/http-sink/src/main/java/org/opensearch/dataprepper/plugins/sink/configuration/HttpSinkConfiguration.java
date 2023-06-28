@@ -89,6 +89,9 @@ public class HttpSinkConfiguration {
     @JsonProperty("dlq_file")
     private String dlqFile;
 
+    @JsonProperty("webhook_url")
+    private String webhookURL;
+
     private PluginModel dlq;
 
     @JsonProperty(USE_ACM_CERT_FOR_SSL)
@@ -126,6 +129,10 @@ public class HttpSinkConfiguration {
 
     public boolean useAcmCertForSSL() {
         return useAcmCertForSSL;
+    }
+
+    public String getWebhookURL() {
+        return webhookURL;
     }
 
     public void validateAndInitializeCertAndKeyFileInS3() {

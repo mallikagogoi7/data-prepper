@@ -24,7 +24,7 @@ import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
-import org.opensearch.dataprepper.plugins.sink.certificate.SSLAuthentication;
+import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
@@ -34,6 +34,7 @@ import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHa
 import org.opensearch.dataprepper.plugins.sink.handler.HttpAuthOptions;
 import org.opensearch.dataprepper.plugins.sink.handler.MultiAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
+import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +99,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
         dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
-                bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration), dlqSink, codecPluginSettings);
+                bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration),
+                dlqSink, codecPluginSettings);
     }
 
     @Override
@@ -140,7 +142,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                                                    final HttpAuthOptions authOptions){
         HttpClientConnectionManager httpClientConnectionManager = null;
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
-            httpClientConnectionManager = new SSLAuthentication(httpSinkConfiguration, certificateProviderFactory).createSslContext();
+            httpClientConnectionManager = new HttpClientSSLConnectionManager()
+                    .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
         }
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
         // TODO: AWS Sigv4 - check

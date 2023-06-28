@@ -22,20 +22,10 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
-public class SSLAuthentication {
+public class HttpClientSSLConnectionManager {
 
-    private final HttpSinkConfiguration sinkConfiguration;
-
-    private final CertificateProviderFactory providerFactory;
-
-    public SSLAuthentication(final HttpSinkConfiguration sinkConfiguration,
-                                      final CertificateProviderFactory providerFactory){
-        this.sinkConfiguration = sinkConfiguration;
-        this.providerFactory = providerFactory;
-    }
-
-
-    public HttpClientConnectionManager createSslContext(){
+    public HttpClientConnectionManager createHttpClientConnectionManager(final HttpSinkConfiguration sinkConfiguration,
+                                                                         final CertificateProviderFactory providerFactory){
         final CertificateProvider certificateProvider = providerFactory.getCertificateProvider();
         final org.opensearch.dataprepper.plugins.certificate.model.Certificate certificate = certificateProvider.getCertificate();
         final SSLContext sslContext = sinkConfiguration.getSslCertificateFile() != null ?
