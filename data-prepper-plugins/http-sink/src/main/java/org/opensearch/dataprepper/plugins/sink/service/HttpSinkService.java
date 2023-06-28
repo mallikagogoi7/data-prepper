@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -47,8 +46,6 @@ public class HttpSinkService {
 
     private final PluginSetting pluginSetting;
 
-    private ExecutorService executorService;
-
     private final Lock reentrantLock;
 
     private WebhookService webhookService;
@@ -58,7 +55,8 @@ public class HttpSinkService {
                            final BufferFactory bufferFactory,
                            final Map<String, HttpAuthOptions> httpAuthOptions,
                            final DLQSink dlqSink,
-                           final PluginSetting pluginSetting){
+                           final PluginSetting pluginSetting,
+                           final WebhookService webhookService){
         this.codec= codec;
         this.httpSinkConf = httpSinkConf;
         this.bufferFactory = bufferFactory;
@@ -66,8 +64,8 @@ public class HttpSinkService {
         this.dlqSink = dlqSink;
         this.pluginSetting = pluginSetting;
         reentrantLock = new ReentrantLock();
-        if(Objects.nonNull(httpSinkConf.getWebhookURL()))
-            this.webhookService = new WebhookService(httpSinkConf.getWebhookURL());
+        this.webhookService = webhookService;
+
     }
 
     public void processRecords(Collection<Record<Event>> records) {
@@ -81,22 +79,22 @@ public class HttpSinkService {
                     final ClassicRequestBuilder classicHttpRequestBuilder =
                             httpAuthOptions.get(urlConfOption.getUrl()).getClassicHttpRequestBuilder();
                     classicHttpRequestBuilder.setEntity(codec.parse(event));
-                    httpAuthOptions.get(urlConfOption.getUrl()).getCloseableHttpClient()
+                    httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().build()
                             .execute(classicHttpRequestBuilder.build(), HttpClientContext.create(), response -> {
-                        LOG.info("Http Response code : " + response.getCode());
-                        responseCode.set(response.getCode());
-                        final HttpEntity entity = response.getEntity();
-                        EntityUtils.consume(entity);
-                        LOG.info("Request Body: " +response.getEntity());
-                        return null;
-                    });
+                                LOG.info("Http Response code : " + response.getCode());
+                                responseCode.set(response.getCode());
+                                final HttpEntity entity = response.getEntity();
+                                EntityUtils.consume(entity);
+                                LOG.info("Request Body: " + response.getEntity());
+                                return response;
+                            });
 
                 }
             }catch(Exception e){
                 LOG.error("Exception while executing http endpoint :",e);
                 FailedDlqData failedDlqData = new FailedDlqData(responseCode.get(), e.getMessage(), record.getData().getEventHandle());
 //                logFailureForDlqObjects(failedDlqData);
-                if(Objects.nonNull(httpSinkConf.getWebhookURL())){
+                if(Objects.nonNull(webhookService)){
                     logFailureForWebHook(failedDlqData);
                 }
 

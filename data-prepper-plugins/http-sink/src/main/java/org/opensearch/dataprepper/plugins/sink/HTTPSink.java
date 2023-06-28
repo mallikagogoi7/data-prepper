@@ -4,9 +4,14 @@
  */
 package org.opensearch.dataprepper.plugins.sink;
 
+import com.linecorp.armeria.client.retry.Backoff;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.util.TimeValue;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.Buffer;
@@ -38,6 +43,7 @@ import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -47,21 +53,43 @@ import java.util.Objects;
 @DataPrepperPlugin(name = "http", pluginType = Sink.class, pluginConfigurationType = HttpSinkConfiguration.class)
 public class HTTPSink extends AbstractSink<Record<Event>> {
 
-    public static final String X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES = "X-Amzn-SageMaker-Custom-Attributes";
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSink.class);
+
+    static final long INITIAL_DELAY = Duration.ofSeconds(20).toMillis();
+
+    static final long MAXIMUM_DELAY = Duration.ofMinutes(5).toMillis();
+
+    static final double JITTER_RATE = 0.20;
+
+    public static final String X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES = "X-Amzn-SageMaker-Custom-Attributes";
+
     public static final String X_AMZN_SAGE_MAKER_INFERENCE_ID = "X-Amzn-SageMaker-Inference-Id";
+
     public static final String X_AMZN_SAGE_MAKER_ENABLE_EXPLANATIONS = "X-Amzn-SageMaker-Enable-Explanations";
+
     public static final String X_AMZN_SAGE_MAKER_TARGET_VARIANT = "X-Amzn-SageMaker-Target-Variant";
+
     public static final String X_AMZN_SAGE_MAKER_TARGET_MODEL = "X-Amzn-SageMaker-Target-Model";
+
     public static final String X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME = "X-Amzn-SageMaker-Target-Container-Hostname";
+
     public static final String PUT = "PUT";
+
     public static final String POST = "POST";
+
     public static final String HTTP_BASIC = "http_basic";
+
     public static final String BEARER_TOKEN = "bearer_token";
-    public static final String MTLS = "mtls";
+
     public static final String UNAUTHENTICATED = "unauthenticated";
 
+    public static final int HTTP_MAX_RETRIES = 5;
+
+    public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
+
     private final HttpSinkConfiguration httpSinkConfiguration;
+
+    private WebhookService webhookService;
 
     private volatile boolean sinkInitialized;
 
@@ -76,6 +104,12 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     private final CertificateProviderFactory certificateProviderFactory;
 
     private final DLQSink dlqSink;
+
+    private final Backoff backoff;
+
+    private HttpClientBuilder httpClientBuilder;
+
+    private HttpClientConnectionManager httpClientConnectionManager;
 
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
@@ -98,9 +132,27 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
         dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
+
+
+        this.backoff = Backoff.exponential(INITIAL_DELAY, MAXIMUM_DELAY).withJitter(JITTER_RATE)
+                .withMaxAttempts(Integer.MAX_VALUE);
+
+        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
+                DEFAULT_HTTP_RETRY_INTERVAL);
+
+        httpClientBuilder = HttpClients.custom().setRetryStrategy(httpRequestRetryStrategy);
+
+        if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
+            httpClientConnectionManager = new HttpClientSSLConnectionManager()
+                    .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
+        }
+
+        if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
+            this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);
+
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
                 bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration),
-                dlqSink, codecPluginSettings);
+                dlqSink, codecPluginSettings,webhookService);
     }
 
     @Override
@@ -139,15 +191,10 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     }
 
     private HttpAuthOptions getAuthHandlerByConfig(final String authType,
-                                                   final HttpAuthOptions authOptions){
-        HttpClientConnectionManager httpClientConnectionManager = null;
-        if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
-            httpClientConnectionManager = new HttpClientSSLConnectionManager()
-                    .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
-        }
+                                                   final HttpAuthOptions.Builder authOptions){
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
         // TODO: AWS Sigv4 - check
-        switch(authType){
+        switch(authType) {
             case HTTP_BASIC:
                 multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
                 break;
@@ -156,34 +203,32 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 break;
             case UNAUTHENTICATED:
             default:
-                return authOptions.setCloseableHttpClient(HttpClients.createMinimal());
+                return authOptions.setHttpClientBuilder(HttpClients.custom()
+                        .addResponseInterceptorLast(new FailedHttpResponseInterceptor(authOptions.getUrl()))).build();
         }
         return multiAuthHttpSinkHandler.authenticate(authOptions);
     }
 
     private Map<String,HttpAuthOptions> buildAuthHttpSinkObjectsByConfig(final HttpSinkConfiguration httpSinkConfiguration){
         final List<UrlConfigurationOption> urlConfigurationOptions = httpSinkConfiguration.getUrlConfigurationOptions();
-
         final Map<String,HttpAuthOptions> authMap = new HashMap<>(urlConfigurationOptions.size());
         urlConfigurationOptions.forEach( urlOption -> {
-            final HttpAuthOptions authOptions = new HttpAuthOptions();
             final String httpMethodString = Objects.nonNull(urlOption.getHttpMethod()) ? urlOption.getHttpMethod() : httpSinkConfiguration.getHttpMethod();
             final String authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
             final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
-
             final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethodString).setUri(urlOption.getUrl());
 
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
                 addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
 
-            authOptions.setUrl(urlOption.getUrl());
-            authOptions.setProxy(proxyUrlString);
-            authOptions.setClassicHttpRequestBuilder(classicRequestBuilder);
+            final HttpAuthOptions.Builder authOptions = new HttpAuthOptions.Builder()
+                    .setUrl(urlOption.getUrl())
+                    .setProxy(proxyUrlString).setClassicHttpRequestBuilder(classicRequestBuilder)
+                    .setHttpClientBuilder(httpClientBuilder);
 
             authMap.put(urlOption.getUrl(),getAuthHandlerByConfig(authType,authOptions));
         });
         return authMap;
-
     }
 
     private void addSageMakerHeaders(final ClassicRequestBuilder classicRequestBuilder,
