@@ -34,12 +34,14 @@ public class DLQSink {
     private static final String S3_PLUGIN_NAME = "s3";
     private final DlqProvider dlqProvider;
 
-    public DLQSink(final PluginFactory pluginFactory, final HttpSinkConfiguration httpSinkConfiguration) {
+    public DLQSink(final PluginFactory pluginFactory,
+                   final HttpSinkConfiguration httpSinkConfiguration) {
          this.dlqProvider = getDlqProvider(pluginFactory, httpSinkConfiguration);
 
     }
 
-    public  void perform(final PluginSetting pluginSetting, final Object failedData) {
+    public  void perform(final PluginSetting pluginSetting,
+                         final Object failedData) {
         DlqWriter dlqWriter = getDlqWriter(pluginSetting.getPipelineName());
         try {
             String pluginId = randomUUID().toString();
@@ -64,7 +66,8 @@ public class DLQSink {
         return dlqWriter;
     }
 
-    private  DlqProvider getDlqProvider(final PluginFactory pluginFactory, final HttpSinkConfiguration httpSinkConfiguration) {
+    private  DlqProvider getDlqProvider(final PluginFactory pluginFactory,
+                                        final HttpSinkConfiguration httpSinkConfiguration) {
         final Map<String, Object> props = new HashMap<>();
         props.put(BUCKET, httpSinkConfiguration.getDlq().getPluginSettings().get("bucket").toString());
         props.put(ROLE_ARN, httpSinkConfiguration.getAwsAuthenticationOptions().getAwsStsRoleArn().toString());

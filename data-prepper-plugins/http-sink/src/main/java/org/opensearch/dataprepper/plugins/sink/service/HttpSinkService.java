@@ -4,7 +4,6 @@
  */
 package org.opensearch.dataprepper.plugins.sink.service;
 
-import io.micrometer.core.instrument.Counter;
 import org.apache.hc.client5.http.HttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -15,7 +14,6 @@ import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.util.TimeValue;
-import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
@@ -33,6 +31,7 @@ import org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
+import org.opensearch.dataprepper.plugins.sink.dlq.DLQSink;
 import org.opensearch.dataprepper.plugins.sink.dlq.FailedDlqData;
 import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler;
@@ -73,13 +72,6 @@ public class HttpSinkService {
 
     public static final String X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME = "X-Amzn-SageMaker-Target-Container-Hostname";
 
-    public static final String OBJECTS_SUCCEEDED = "httpSinkObjectsSucceeded";
-    public static final String OBJECTS_FAILED = "httpSinkObjectsFailed";
-    public static final String NUMBER_OF_RECORDS_SUCCESSFULLY_SENT_TO_HTTP_ENDPOINT = "httpSinkObjectsEventsSucceeded";
-    public static final String NUMBER_OF_RECORDS_FAILED_PUSH_HTTP_ENDPOINT = "httpSinkObjectsEventsFailed";
-    static final String S3_OBJECTS_SIZE = "s3SinkObjectSizeBytes";
-
-
     private final Codec codec;
 
     private final Collection<EventHandle> bufferedEventHandles;
@@ -96,6 +88,7 @@ public class HttpSinkService {
 
     private final Lock reentrantLock;
     private final CertificateProviderFactory certificateProviderFactory;
+
     private final HttpClientBuilder httpClientBuilder;
 
     private final int maxEvents;
@@ -104,21 +97,11 @@ public class HttpSinkService {
 
     private final long maxCollectionDuration;
 
-    private final PluginMetrics pluginMetrics;
-
     private WebhookService webhookService;
 
     private HttpClientConnectionManager httpClientConnectionManager;
 
     private Buffer currentBuffer;
-
-    private final Counter objectsSucceededCounter;
-
-    private final Counter objectsFailedCounter;
-
-    private final Counter numberOfRecordsSuccessCounter;
-
-    private final Counter numberOfRecordsFailedCounter;
 
     public HttpSinkService(final Codec codec,
                            final HttpSinkConfiguration httpSinkConfiguration,
@@ -126,8 +109,7 @@ public class HttpSinkService {
                            final CertificateProviderFactory certificateProviderFactory,
                            final DLQSink dlqSink,
                            final PluginSetting pluginSetting,
-                           final WebhookService webhookService,
-                           final PluginMetrics pluginMetrics){
+                           final WebhookService webhookService){
         this.codec= codec;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
@@ -137,18 +119,11 @@ public class HttpSinkService {
         reentrantLock = new ReentrantLock();
         this.webhookService = webhookService;
         this.certificateProviderFactory = certificateProviderFactory;
-        this.pluginMetrics = pluginMetrics;
-
         this.bufferedEventHandles = new LinkedList<>();
 
         this.maxEvents = httpSinkConfiguration.getThresholdOptions().getEventCount();
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
-
-        this.objectsSucceededCounter = pluginMetrics.counter(OBJECTS_SUCCEEDED);
-        this.objectsFailedCounter = pluginMetrics.counter(OBJECTS_FAILED);
-        this.numberOfRecordsSuccessCounter = pluginMetrics.counter(NUMBER_OF_RECORDS_SUCCESSFULLY_SENT_TO_HTTP_ENDPOINT);
-        this.numberOfRecordsFailedCounter = pluginMetrics.counter(NUMBER_OF_RECORDS_FAILED_PUSH_HTTP_ENDPOINT);
 
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
             httpClientConnectionManager = new HttpClientSSLConnectionManager()
@@ -177,7 +152,7 @@ public class HttpSinkService {
                 this.bufferedEventHandles.add(event.getEventHandle());
             }
             if(checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)){
-                final List<HttpEndPointResponse> failedHttpEndPointResponses = pushToEndPoint(responseCode, getCurrentBufferData(currentBuffer));
+                final List<HttpEndPointResponse> failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
                 if(!failedHttpEndPointResponses.isEmpty())
                     logFailedData(failedHttpEndPointResponses,getCurrentBufferData(currentBuffer));
                 else
@@ -214,8 +189,7 @@ public class HttpSinkService {
         bufferedEventHandles.clear();
     }
 
-    private List<HttpEndPointResponse> pushToEndPoint(final AtomicInteger responseCode,
-                                   final byte[] currentBufferData) {
+    private List<HttpEndPointResponse> pushToEndPoint(final byte[] currentBufferData) {
             List<HttpEndPointResponse> httpEndPointResponses = new ArrayList<>(httpSinkConfiguration.getUrlConfigurationOptions().size());
         for(UrlConfigurationOption urlConfOption: httpSinkConfiguration.getUrlConfigurationOptions()) {
             final ClassicRequestBuilder classicHttpRequestBuilder =

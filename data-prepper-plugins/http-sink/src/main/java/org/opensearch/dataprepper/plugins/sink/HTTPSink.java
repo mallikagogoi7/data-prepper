@@ -25,6 +25,7 @@ import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
+import org.opensearch.dataprepper.plugins.sink.dlq.DLQSink;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
@@ -98,9 +99,13 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
             this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);
 
-        this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
-                bufferFactory,certificateProviderFactory,
-                dlqSink, codecPluginSettings,webhookService,pluginMetrics);
+        this.httpSinkService = new HttpSinkService(codec,
+                httpSinkConfiguration,
+                bufferFactory,
+                certificateProviderFactory,
+                dlqSink,
+                codecPluginSettings,
+                webhookService);
     }
 
     @Override

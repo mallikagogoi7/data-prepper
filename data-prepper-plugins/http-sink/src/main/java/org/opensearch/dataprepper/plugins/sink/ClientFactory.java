@@ -16,7 +16,10 @@ import java.util.Map;
 public final class ClientFactory {
     private ClientFactory() { }
 
-    static S3Client createS3Client(final Region region, final String roleArn, final Map<String, String> stsHeader, final AwsCredentialsSupplier awsCredentialsSupplier) {
+    static S3Client createS3Client(final Region region,
+                                   final String roleArn,
+                                   final Map<String, String> stsHeader,
+                                   final AwsCredentialsSupplier awsCredentialsSupplier) {
         final AwsCredentialsOptions awsCredentialsOptions = convertToCredentialsOptions(region, roleArn, stsHeader);
         final AwsCredentialsProvider awsCredentialsProvider = awsCredentialsSupplier.getProvider(awsCredentialsOptions);
 
@@ -29,7 +32,9 @@ public final class ClientFactory {
                 .build();
     }
 
-    private static AwsCredentialsOptions convertToCredentialsOptions(final Region region, final String roleArn, final Map<String, String> stsHeader) {
+    private static AwsCredentialsOptions convertToCredentialsOptions(final Region region,
+                                                                     final String roleArn,
+                                                                     final Map<String, String> stsHeader) {
         return AwsCredentialsOptions.builder()
                 .withRegion(region)
                 .withStsRoleArn(roleArn)

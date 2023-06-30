@@ -22,7 +22,7 @@ public class HttpAuthOptions {
         return closeableHttpClient;
     }
 
-    public HttpAuthOptions setCloseableHttpClient(CloseableHttpClient closeableHttpClient) {
+    public HttpAuthOptions setCloseableHttpClient(final CloseableHttpClient closeableHttpClient) {
         this.closeableHttpClient = closeableHttpClient;
         return this;
     }
@@ -31,7 +31,7 @@ public class HttpAuthOptions {
         return classicHttpRequest;
     }
 
-    public HttpAuthOptions setClassicHttpRequest(ClassicHttpRequest classicHttpRequest) {
+    public HttpAuthOptions setClassicHttpRequest(final ClassicHttpRequest classicHttpRequest) {
         this.classicHttpRequest = classicHttpRequest;
         return this;
     }
@@ -49,7 +49,7 @@ public class HttpAuthOptions {
         return url;
     }
 
-    public HttpAuthOptions setUrl(String url) {
+    public HttpAuthOptions setUrl(final String url) {
         this.url = url;
         return this;
     }
@@ -58,7 +58,7 @@ public class HttpAuthOptions {
         return proxy;
     }
 
-    public HttpAuthOptions setProxy(String proxy) {
+    public HttpAuthOptions setProxy(final String proxy) {
         this.proxy = proxy;
         return this;
     }
