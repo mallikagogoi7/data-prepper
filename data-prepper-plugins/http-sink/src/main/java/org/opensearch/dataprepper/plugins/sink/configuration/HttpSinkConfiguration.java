@@ -64,6 +64,7 @@ public class HttpSinkConfiguration {
     @JsonProperty("buffer_type")
     private BufferTypeOptions bufferType = BufferTypeOptions.IN_MEMORY;
 
+    @NotNull
     @JsonProperty("threshold")
     private ThresholdOptions thresholdOptions;
 

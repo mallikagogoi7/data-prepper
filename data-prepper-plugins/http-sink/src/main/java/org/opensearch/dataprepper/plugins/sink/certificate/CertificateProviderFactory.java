@@ -1,7 +1,8 @@
-package org.opensearch.dataprepper.plugins.sink.certificate;/*
+/*
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+package org.opensearch.dataprepper.plugins.sink.certificate;
 
 import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.plugins.certificate.CertificateProvider;

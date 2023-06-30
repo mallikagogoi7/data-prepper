@@ -5,13 +5,7 @@
 package org.opensearch.dataprepper.plugins.sink;
 
 import com.linecorp.armeria.client.retry.Backoff;
-import org.apache.hc.client5.http.HttpRequestRetryStrategy;
-import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.hc.core5.util.TimeValue;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.Buffer;
@@ -29,17 +23,8 @@ import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
-import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
-import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
-import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
-import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler;
-import org.opensearch.dataprepper.plugins.sink.handler.HttpAuthOptions;
-import org.opensearch.dataprepper.plugins.sink.handler.MultiAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
@@ -47,13 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-
-import static org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions.*;
-import static org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions.*;
 
 @DataPrepperPlugin(name = "http", pluginType = Sink.class, pluginConfigurationType = HttpSinkConfiguration.class)
 public class HTTPSink extends AbstractSink<Record<Event>> {
@@ -65,22 +44,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     static final long MAXIMUM_DELAY = Duration.ofMinutes(5).toMillis();
 
     static final double JITTER_RATE = 0.20;
-
-    public static final String X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES = "X-Amzn-SageMaker-Custom-Attributes";
-
-    public static final String X_AMZN_SAGE_MAKER_INFERENCE_ID = "X-Amzn-SageMaker-Inference-Id";
-
-    public static final String X_AMZN_SAGE_MAKER_ENABLE_EXPLANATIONS = "X-Amzn-SageMaker-Enable-Explanations";
-
-    public static final String X_AMZN_SAGE_MAKER_TARGET_VARIANT = "X-Amzn-SageMaker-Target-Variant";
-
-    public static final String X_AMZN_SAGE_MAKER_TARGET_MODEL = "X-Amzn-SageMaker-Target-Model";
-
-    public static final String X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME = "X-Amzn-SageMaker-Target-Container-Hostname";
-
-    public static final int HTTP_MAX_RETRIES = 5;
-
-    public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
 
     private final HttpSinkConfiguration httpSinkConfiguration;
 
@@ -104,8 +67,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private HttpClientBuilder httpClientBuilder;
 
-    private HttpClientConnectionManager httpClientConnectionManager;
-
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
                     final HttpSinkConfiguration httpSinkConfiguration,
@@ -124,30 +85,22 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         } else {
             bufferFactory = new InMemoryBufferFactory();
         }
+
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
+
         dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
 
 
         this.backoff = Backoff.exponential(INITIAL_DELAY, MAXIMUM_DELAY).withJitter(JITTER_RATE)
                 .withMaxAttempts(Integer.MAX_VALUE);
 
-        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
-                DEFAULT_HTTP_RETRY_INTERVAL);
-
-        httpClientBuilder = HttpClients.custom().setRetryStrategy(httpRequestRetryStrategy);
-
-        if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
-            httpClientConnectionManager = new HttpClientSSLConnectionManager()
-                    .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
-        }
-
         if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
             this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);
 
         this.httpSinkService = new HttpSinkService(codec,httpSinkConfiguration,
-                bufferFactory,buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration),
-                dlqSink, codecPluginSettings,webhookService);
+                bufferFactory,certificateProviderFactory,
+                dlqSink, codecPluginSettings,webhookService,pluginMetrics);
     }
 
     @Override
@@ -182,72 +135,9 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         if (records.isEmpty()) {
             return;
         }
-        httpSinkService.processRecords(records);
+        httpSinkService.output(records);
     }
 
-    private HttpAuthOptions getAuthHandlerByConfig(final AuthTypeOptions authType,
-                                                   final HttpAuthOptions.Builder authOptions){
-        MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
-        // TODO: AWS Sigv4 - check
-        switch(authType) {
-            case HTTP_BASIC:
-                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
-                break;
-            case BEARER_TOKEN:
-                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(httpClientConnectionManager);
-                break;
-            case UNAUTHENTICATED:
-            default:
-                return authOptions.setHttpClientBuilder(HttpClients.custom()
-                        .addResponseInterceptorLast(new FailedHttpResponseInterceptor(authOptions.getUrl()))).build();
-        }
-        return multiAuthHttpSinkHandler.authenticate(authOptions);
-    }
 
-    private Map<String,HttpAuthOptions> buildAuthHttpSinkObjectsByConfig(final HttpSinkConfiguration httpSinkConfiguration){
-        final List<UrlConfigurationOption> urlConfigurationOptions = httpSinkConfiguration.getUrlConfigurationOptions();
-        final Map<String,HttpAuthOptions> authMap = new HashMap<>(urlConfigurationOptions.size());
-        urlConfigurationOptions.forEach( urlOption -> {
-            final HTTPMethodOptions httpMethod = Objects.nonNull(urlOption.getHttpMethod()) ? urlOption.getHttpMethod() : httpSinkConfiguration.getHttpMethod();
-            final AuthTypeOptions authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
-            final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
-            final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethod).setUri(urlOption.getUrl());
-
-            if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
-                addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
-
-            final HttpAuthOptions.Builder authOptions = new HttpAuthOptions.Builder()
-                    .setUrl(urlOption.getUrl())
-                    .setProxy(proxyUrlString).setClassicHttpRequestBuilder(classicRequestBuilder)
-                    .setHttpClientBuilder(httpClientBuilder);
-
-            authMap.put(urlOption.getUrl(),getAuthHandlerByConfig(authType,authOptions));
-        });
-        return authMap;
-    }
-
-    private void addSageMakerHeaders(final ClassicRequestBuilder classicRequestBuilder,
-                                               final CustomHeaderOptions customHeaderOptions) {
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES,customHeaderOptions.getCustomAttributes());
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_INFERENCE_ID,customHeaderOptions.getInferenceId());
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_ENABLE_EXPLANATIONS,customHeaderOptions.getEnableExplanations());
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_VARIANT,customHeaderOptions.getTargetVariant());
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_MODEL,customHeaderOptions.getTargetModel());
-        classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME,customHeaderOptions.getTargetContainerHostname());
-    }
-
-    private ClassicRequestBuilder buildRequestByHTTPMethodType(final HTTPMethodOptions httpMethodOptions) {
-        final ClassicRequestBuilder classicRequestBuilder;
-        switch(httpMethodOptions){
-            case PUT:
-                classicRequestBuilder = ClassicRequestBuilder.put();
-                break;
-            case POST:
-            default:
-                classicRequestBuilder = ClassicRequestBuilder.post();
-                break;
-        }
-        return classicRequestBuilder;
-    }
 
 }

@@ -1,3 +1,7 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package org.opensearch.dataprepper.plugins.sink.handler;
 
 import org.apache.hc.client5.http.auth.AuthScope;
@@ -8,10 +12,6 @@ import org.apache.hc.core5.http.HttpHost;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;
-
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
 
 public class BasicAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
 

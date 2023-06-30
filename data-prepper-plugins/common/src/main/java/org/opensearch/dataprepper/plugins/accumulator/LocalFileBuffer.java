@@ -8,9 +8,6 @@ package org.opensearch.dataprepper.plugins.accumulator;
 import org.apache.commons.lang3.time.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -56,19 +53,11 @@ public class LocalFileBuffer implements Buffer {
         return watch.getTime(TimeUnit.SECONDS);
     }
 
-    /**
-     * Upload accumulated data to amazon s3.
-     * @param s3Client s3 client object.
-     * @param bucket bucket name.
-     * @param key s3 object key path.
-     */
     @Override
-    public void flushToS3(S3Client s3Client, String bucket, String key) {
-        flushAndCloseStream();
-        s3Client.putObject(
-                PutObjectRequest.builder().bucket(bucket).key(key).build(),
-                RequestBody.fromFile(localFile));
+    public byte[] getSinkBufferData() throws IOException {
+        final byte[] fileData = Files.readAllBytes(localFile.toPath());
         removeTemporaryFile();
+        return fileData;
     }
 
     /**

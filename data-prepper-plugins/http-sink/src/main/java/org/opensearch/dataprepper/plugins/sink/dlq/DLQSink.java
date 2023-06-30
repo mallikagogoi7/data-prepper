@@ -2,9 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-
-
-package org.opensearch.dataprepper.plugins.sink;
+package org.opensearch.dataprepper.plugins.sink.dlq;
 
 import org.opensearch.dataprepper.metrics.MetricNames;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
@@ -15,7 +13,11 @@ import org.opensearch.dataprepper.plugins.dlq.DlqWriter;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.StringJoiner;
 
 import static java.util.UUID.randomUUID;
 

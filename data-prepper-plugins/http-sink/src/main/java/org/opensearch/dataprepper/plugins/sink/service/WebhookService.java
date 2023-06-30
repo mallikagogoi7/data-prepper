@@ -1,3 +1,7 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package org.opensearch.dataprepper.plugins.sink.service;
 
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -15,8 +19,8 @@ import java.net.URL;
 
 public class WebhookService {
 
-
     private final HttpClientBuilder httpClientBuilder;
+
     private URL url;
 
     public WebhookService(final String url,

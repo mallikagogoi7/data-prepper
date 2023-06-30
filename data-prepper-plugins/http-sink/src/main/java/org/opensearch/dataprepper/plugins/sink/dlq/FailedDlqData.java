@@ -1,94 +1,63 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package org.opensearch.dataprepper.plugins.sink.dlq;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.opensearch.dataprepper.model.event.EventHandle;
+import org.opensearch.dataprepper.plugins.sink.HttpEndPointResponse;
 
-import java.util.Objects;
+import java.util.List;
 
 public class FailedDlqData {
 
-    private final int status;
-
-    private final String message;
-
+    private final List<HttpEndPointResponse> endPointResponses;
     @JsonIgnore
-    private final EventHandle eventHandle;
+    private final String bufferData;
 
-    public FailedDlqData(final int status,
-                          final String message,
-                          final EventHandle eventHandle) {
-        this.status = status;
-        Objects.requireNonNull(message);
-        this.message = message;
-        this.eventHandle = eventHandle;
+    public FailedDlqData(final Builder builder) {
+        this.endPointResponses = builder.endPointResponses;
+        this.bufferData = builder.bufferData;
     }
 
-    public int getStatus() {
-        return status;
+    public List<HttpEndPointResponse> getEndPointResponses() {
+        return endPointResponses;
     }
 
-    public String getMessage() {
-        return message;
-    }
-    public EventHandle getEventHandle() {
-        return eventHandle;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        final FailedDlqData that = (FailedDlqData) o;
-        return Objects.equals(status, that.status) &&
-            Objects.equals(message, that.message);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(status, message);
-    }
-
-    @Override
-    public String toString() {
-        return "FailedDlqData{" +
-            ", status='" + status + '\'' +
-            ", message='" + message + '\'' +
-            '}';
+    public String getBufferData() {
+        return bufferData;
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
+    @Override
+    public String toString() {
+        return "{" +
+                "endPointResponses=" + endPointResponses +
+                ", bufferData='" + bufferData + '\'' +
+                '}';
+    }
+
     public static class Builder {
 
-        private EventHandle eventHandle;
+        private List<HttpEndPointResponse> endPointResponses;
 
-        private int status = 0;
+        private String bufferData;
 
-        private String message;
-
-        public Builder withStatus(final int status) {
-            this.status = status;
+        public Builder withEndPointResponses(List<HttpEndPointResponse> endPointResponses) {
+            this.endPointResponses = endPointResponses;
             return this;
         }
 
-        public Builder withMessage(final String message) {
-            this.message = message;
-            return this;
-        }
-
-        public Builder withEventHandle(final EventHandle eventHandle) {
-            this.eventHandle = eventHandle;
+        public Builder withBufferData(String bufferData) {
+            this.bufferData = bufferData;
             return this;
         }
 
         public FailedDlqData build() {
-            return new FailedDlqData(status, message, eventHandle);
+            return new FailedDlqData(this);
         }
     }
 }
