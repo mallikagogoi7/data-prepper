@@ -40,12 +40,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSink.class);
 
-    static final long INITIAL_DELAY = Duration.ofSeconds(20).toMillis();
-
-    static final long MAXIMUM_DELAY = Duration.ofMinutes(5).toMillis();
-
-    static final double JITTER_RATE = 0.20;
-
     private final HttpSinkConfiguration httpSinkConfiguration;
 
     private WebhookService webhookService;
@@ -63,8 +57,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     private final CertificateProviderFactory certificateProviderFactory;
 
     private final DLQSink dlqSink;
-
-    private final Backoff backoff;
 
     private HttpClientBuilder httpClientBuilder;
 
@@ -91,10 +83,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
 
         dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
-
-
-        this.backoff = Backoff.exponential(INITIAL_DELAY, MAXIMUM_DELAY).withJitter(JITTER_RATE)
-                .withMaxAttempts(Integer.MAX_VALUE);
 
         if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
             this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);

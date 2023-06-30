@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -48,7 +49,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -59,6 +59,12 @@ public class HttpSinkService {
     public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
 
     public static final int HTTP_MAX_RETRIES = 5;
+
+    static final long INITIAL_DELAY = Duration.ofSeconds(20).toMillis();
+
+    static final long MAXIMUM_DELAY = Duration.ofMinutes(5).toMillis();
+
+    static final double JITTER_RATE = 0.20;
 
     public static final String X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES = "X-Amzn-SageMaker-Custom-Attributes";
 
@@ -132,7 +138,8 @@ public class HttpSinkService {
         final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
                 DEFAULT_HTTP_RETRY_INTERVAL);
 
-        this.httpClientBuilder = HttpClients.custom().setRetryStrategy(httpRequestRetryStrategy);
+        this.httpClientBuilder = HttpClients.custom()
+                .setRetryStrategy(httpRequestRetryStrategy);
     }
 
     public void output(Collection<Record<Event>> records) {
@@ -140,7 +147,6 @@ public class HttpSinkService {
         if (currentBuffer == null) {
             this.currentBuffer = bufferFactory.getBuffer();
         }
-        AtomicInteger responseCode = new AtomicInteger();
         records.forEach(record -> {
             final Event event = record.getData();
             try {
@@ -153,10 +159,11 @@ public class HttpSinkService {
             }
             if(checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)){
                 final List<HttpEndPointResponse> failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
-                if(!failedHttpEndPointResponses.isEmpty())
-                    logFailedData(failedHttpEndPointResponses,getCurrentBufferData(currentBuffer));
-                else
+                if(!failedHttpEndPointResponses.isEmpty()) {
+                    logFailedData(failedHttpEndPointResponses, getCurrentBufferData(currentBuffer));
+                } else {
                     LOG.info("data pushed to all the end points successfully");
+                }
                 currentBuffer = bufferFactory.getBuffer();
                 releaseEventHandles(Boolean.TRUE);
                 }
@@ -175,7 +182,7 @@ public class HttpSinkService {
     private void logFailedData(final List<HttpEndPointResponse> endPointResponses, final byte[] currentBufferData) {
         FailedDlqData failedDlqData =
                 FailedDlqData.builder().withBufferData(new String(currentBufferData)).withEndPointResponses(endPointResponses).build();
-        LOG.info("Failed to push the data. Faild DLQ Data: {}",failedDlqData);
+        LOG.info("Failed to push the data. Failed DLQ Data: {}",failedDlqData);
         logFailureForDlqObjects(failedDlqData);
         if(Objects.nonNull(webhookService)){
             logFailureForWebHook(failedDlqData);
@@ -203,6 +210,8 @@ public class HttpSinkService {
                 LOG.error("Exception while pushing buffer data to end point. URL : {}, Exception : ",urlConfOption.getUrl(),e);
                 httpEndPointResponses.add(new HttpEndPointResponse(urlConfOption.getUrl(),HttpStatus.SC_INTERNAL_SERVER_ERROR,e.getMessage()));
             }
+
+
         }
         return httpEndPointResponses;
     }
