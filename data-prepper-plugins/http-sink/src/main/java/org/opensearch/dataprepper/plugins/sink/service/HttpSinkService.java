@@ -11,6 +11,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.util.TimeValue;
@@ -41,6 +42,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -204,11 +207,26 @@ public class HttpSinkService {
             classicHttpRequestBuilder.setEntity(new String(currentBufferData));
             final CloseableHttpResponse response;
             try {
-                response = httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().build()
-                        .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
+                if(httpAuthOptions.get(urlConfOption.getUrl()).getProxy() != null) {
+                    LOG.info("Execution using proxy");
+                    URL targetUrl = new URL(urlConfOption.getUrl());
+                    final HttpHost targetHost = new HttpHost(targetUrl.toURI().getScheme(), targetUrl.getHost(), targetUrl.getPort());
+
+                    URL proxyUrl = new URL(urlConfOption.getProxy());
+                    final HttpHost proxyHost = new HttpHost(proxyUrl.toURI().getScheme(), proxyUrl.getHost(), proxyUrl.getPort());
+
+                    response = httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().setProxy(proxyHost).build()
+                            .execute(targetHost, classicHttpRequestBuilder.build(), HttpClientContext.create());
+                }else {
+                    response = httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().build()
+                            .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
+                }
+
             } catch (IOException e) {
                 LOG.error("Exception while pushing buffer data to end point. URL : {}, Exception : ",urlConfOption.getUrl(),e);
                 httpEndPointResponses.add(new HttpEndPointResponse(urlConfOption.getUrl(),HttpStatus.SC_INTERNAL_SERVER_ERROR,e.getMessage()));
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
             }
 
 
@@ -247,7 +265,7 @@ public class HttpSinkService {
                 multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
                 break;
             case BEARER_TOKEN:
-                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(httpClientConnectionManager);
+                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
                 break;
             case UNAUTHENTICATED:
             default:

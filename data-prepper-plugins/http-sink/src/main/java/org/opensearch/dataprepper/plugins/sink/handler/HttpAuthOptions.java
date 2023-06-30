@@ -100,6 +100,10 @@ public class HttpAuthOptions {
             this.proxy = proxy;
             return this;
         }
+
+        public ClassicRequestBuilder getClassicHttpRequestBuilder() {
+            return classicHttpRequestBuilder;
+        }
     }
 
 
