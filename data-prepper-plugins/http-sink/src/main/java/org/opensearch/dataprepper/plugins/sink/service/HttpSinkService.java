@@ -74,6 +74,8 @@ public class HttpSinkService {
     public static final String TOKEN = "token";
 
     public static final String BEARER = "Bearer ";
+    public static final String HTTP_SINK_RECORDS_SUCCESS_COUNTER = "httpSinkRecordsSuccessPushToEndPoint";
+    public static final String HTTP_SINK_RECORDS_FAILED_COUNTER = "httpSinkRecordsFailedToPushEndPoint";
 
     private final Codec codec;
 
@@ -137,8 +139,8 @@ public class HttpSinkService {
             this.httpClientConnectionManager = new HttpClientSSLConnectionManager()
                     .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
         }
-        this.httpSinkRecordsSuccessCounter = pluginMetrics.counter("HTTP_SINK_RECORDS_SUCCESS_COUNTER");
-        this.httpSinkRecordsFailedCounter = pluginMetrics.counter("HTTP_SINK_RECORDS_FAILED_COUNTER");
+        this.httpSinkRecordsSuccessCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_SUCCESS_COUNTER);
+        this.httpSinkRecordsFailedCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_FAILED_COUNTER);
     }
 
     public void output(Collection<Record<Event>> records) {
