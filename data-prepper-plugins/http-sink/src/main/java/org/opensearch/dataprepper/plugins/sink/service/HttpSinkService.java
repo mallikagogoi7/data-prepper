@@ -5,7 +5,6 @@
 package org.opensearch.dataprepper.plugins.sink.service;
 
 import io.micrometer.core.instrument.Counter;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -123,13 +122,13 @@ public class HttpSinkService {
         this.codec= codec;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
-        this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
         this.dlqSink = dlqSink;
         this.pluginSetting = pluginSetting;
         this.reentrantLock = new ReentrantLock();
         this.webhookService = webhookService;
         this.bufferedEventHandles = new LinkedList<>();
         this.httpClientBuilder = httpClientBuilder;
+        this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
 
         this.maxEvents = httpSinkConfiguration.getThresholdOptions().getEventCount();
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
@@ -274,8 +273,9 @@ public class HttpSinkService {
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
                 addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
 
-            if(Objects.nonNull(proxyUrlString))
+            if(Objects.nonNull(proxyUrlString)) {
                 httpClientBuilder.setProxy(HttpSinkUtil.getHttpHostByURL(HttpSinkUtil.getURLByUrlString(proxyUrlString)));
+            }
 
             final HttpAuthOptions.Builder authOptions = new HttpAuthOptions.Builder()
                     .setUrl(urlOption.getUrl())
