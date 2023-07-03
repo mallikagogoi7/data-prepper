@@ -20,14 +20,25 @@ import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfigurati
 
 import javax.net.ssl.SSLContext;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
+/**
+ * This class implements SSL certs authentication
+ *
+ */
 public class HttpClientSSLConnectionManager {
 
+    /**
+     * This method creates HttpClientConnectionManager for SSL certs authentication
+     * @param sinkConfiguration HttpSinkConfiguration
+     * @param providerFactory CertificateProviderFactory
+     * @return HttpClientConnectionManager
+     */
     public HttpClientConnectionManager createHttpClientConnectionManager(final HttpSinkConfiguration sinkConfiguration,
                                                                          final CertificateProviderFactory providerFactory){
         final CertificateProvider certificateProvider = providerFactory.getCertificateProvider();
@@ -45,8 +56,6 @@ public class HttpClientSSLConnectionManager {
                         .build())
                 .build();
     }
-
-
 
     private SSLContext getCAStrategy(final InputStream certificate) {
         try {

@@ -21,6 +21,10 @@ import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.services.acm.AcmClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
+/**
+ * This class consist logic for downloading the SSL certificates from S3/ACM/Local file.
+ *
+ */
 public class CertificateProviderFactory {
     private static final Logger LOG = LoggerFactory.getLogger(CertificateProviderFactory.class);
 
@@ -29,6 +33,10 @@ public class CertificateProviderFactory {
         this.httpSinkConfiguration = httpSinkConfiguration;
     }
 
+    /**
+     * This method consist logic for downloading the SSL certificates from S3/ACM/Local file.
+     * @return CertificateProvider
+     */
     public CertificateProvider getCertificateProvider() {
         if (httpSinkConfiguration.useAcmCertForSSL()) {
             LOG.info("Using ACM certificate and private key for SSL/TLS.");

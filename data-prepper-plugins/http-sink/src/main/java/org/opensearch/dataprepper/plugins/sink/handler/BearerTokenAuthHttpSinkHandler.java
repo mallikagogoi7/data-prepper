@@ -7,6 +7,9 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 
+/**
+ * * This class handles Bearer Token Authentication
+ */
 public class BearerTokenAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
 
     public static final String AUTHORIZATION = "Authorization";

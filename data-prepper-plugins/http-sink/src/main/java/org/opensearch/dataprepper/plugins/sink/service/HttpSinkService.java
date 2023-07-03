@@ -29,7 +29,7 @@ import org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
-import org.opensearch.dataprepper.plugins.sink.dlq.DLQSink;
+import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
 import org.opensearch.dataprepper.plugins.sink.dlq.FailedDlqData;
 import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler;
@@ -39,7 +39,11 @@ import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -50,6 +54,9 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * This service class contains logic for sending data to Http Endpoints
+ */
 public class HttpSinkService {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpSinkService.class);
@@ -86,7 +93,7 @@ public class HttpSinkService {
 
     private final Map<String,HttpAuthOptions> httpAuthOptions;
 
-    private final DLQSink dlqSink;
+    private final HttpSinkDlqUtil httpSinkDlqUtil;
 
     private final PluginSetting pluginSetting;
 
@@ -114,7 +121,7 @@ public class HttpSinkService {
                            final HttpSinkConfiguration httpSinkConfiguration,
                            final BufferFactory bufferFactory,
                            final CertificateProviderFactory certificateProviderFactory,
-                           final DLQSink dlqSink,
+                           final HttpSinkDlqUtil httpSinkDlqUtil,
                            final PluginSetting pluginSetting,
                            final WebhookService webhookService,
                            final HttpClientBuilder httpClientBuilder,
@@ -122,14 +129,13 @@ public class HttpSinkService {
         this.codec= codec;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
-        this.dlqSink = dlqSink;
+        this.httpSinkDlqUtil = httpSinkDlqUtil;
         this.pluginSetting = pluginSetting;
         this.reentrantLock = new ReentrantLock();
         this.webhookService = webhookService;
         this.bufferedEventHandles = new LinkedList<>();
         this.httpClientBuilder = httpClientBuilder;
         this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
-
         this.maxEvents = httpSinkConfiguration.getThresholdOptions().getEventCount();
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
@@ -142,6 +148,10 @@ public class HttpSinkService {
         this.httpSinkRecordsFailedCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_FAILED_COUNTER);
     }
 
+    /**
+     * This method process buffer records and send to Http End points based on configured codec
+     * @param records Collection<Record<Event>>
+     */
     public void output(Collection<Record<Event>> records) {
         reentrantLock.lock();
         if (currentBuffer == null) {
@@ -179,11 +189,17 @@ public class HttpSinkService {
         }
     }
 
+    /**
+     * * This method logs Failed Data to DLQ and Webhook
+     *  @param endPointResponses HttpEndPointResponses.
+     *  @param currentBufferData Current bufferData.
+     */
     private void logFailedData(final List<HttpEndPointResponse> endPointResponses, final byte[] currentBufferData) {
         FailedDlqData failedDlqData =
                 FailedDlqData.builder().withBufferData(new String(currentBufferData)).withEndPointResponses(endPointResponses).build();
         LOG.info("Failed to push the data. Failed DLQ Data: {}",failedDlqData);
-//        logFailureForDlqObjects(failedDlqData);
+
+        logFailureForDlqObjects(failedDlqData);
         if(Objects.nonNull(webhookService)){
             logFailureForWebHook(failedDlqData);
         }
@@ -196,6 +212,10 @@ public class HttpSinkService {
         bufferedEventHandles.clear();
     }
 
+    /**
+     * * This method pushes bufferData to configured HttpEndPoints
+     *  @param currentBufferData bufferData.
+     */
     private List<HttpEndPointResponse> pushToEndPoint(final byte[] currentBufferData) {
         List<HttpEndPointResponse> httpEndPointResponses = new ArrayList<>(httpSinkConfiguration.getUrlConfigurationOptions().size());
         httpSinkConfiguration.getUrlConfigurationOptions().forEach( urlConfOption -> {
@@ -217,6 +237,14 @@ public class HttpSinkService {
         return httpEndPointResponses;
     }
 
+    /**
+     * * This method checks configured pipeline Threshold
+     *  @param currentBuffer bufferData.
+     *  @param maxEvents max Event count.
+     *  @param maxBytes maximum ByteCount.
+     *  @param maxCollectionDuration maximum CollectionDuration.
+     *  @return boolean
+     */
     public static boolean checkThresholdExceed(final Buffer currentBuffer,
                                                final int maxEvents,
                                                final ByteCount maxBytes,
@@ -231,14 +259,37 @@ public class HttpSinkService {
         }
     }
 
+    /**
+     * * This method sends Failed objects to DLQ
+     *  @param failedDlqData FailedDlqData.
+     */
     private void logFailureForDlqObjects(final FailedDlqData failedDlqData){
-            dlqSink.perform(pluginSetting, failedDlqData);
+        if(httpSinkConfiguration.getDlqFile() != null)
+            try {
+                BufferedWriter dlqFileWriter = Files.newBufferedWriter(Paths.get(httpSinkConfiguration.getDlqFile()), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                dlqFileWriter.write(failedDlqData.toString());
+                dlqFileWriter.close();
+            }catch (IOException e) {
+                LOG.error("Exception while writing failed data to DLQ file Exception: ",e);
+            }
+        else {
+            httpSinkDlqUtil.perform(pluginSetting, failedDlqData);
+        }
     }
 
+    /**
+     * * This method push Failed objects to Webhook
+     *  @param failedDlqData FailedDlqData.
+     */
     private void logFailureForWebHook(final FailedDlqData failedDlqData){
         webhookService.pushWebhook(failedDlqData);
     }
 
+    /**
+     * * This method gets Auth Handler classes based on configuration
+     *  @param authType AuthTypeOptions.
+     *  @param authOptions HttpAuthOptions.Builder.
+     */
     private HttpAuthOptions getAuthHandlerByConfig(final AuthTypeOptions authType,
                                                    final HttpAuthOptions.Builder authOptions){
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
@@ -261,6 +312,10 @@ public class HttpSinkService {
         return multiAuthHttpSinkHandler.authenticate(authOptions);
     }
 
+    /**
+     * * This method build HttpAuthOptions class based on configurations
+     *  @param httpSinkConfiguration HttpSinkConfiguration.
+     */
     private Map<String,HttpAuthOptions> buildAuthHttpSinkObjectsByConfig(final HttpSinkConfiguration httpSinkConfiguration){
         final List<UrlConfigurationOption> urlConfigurationOptions = httpSinkConfiguration.getUrlConfigurationOptions();
         final Map<String,HttpAuthOptions> authMap = new HashMap<>(urlConfigurationOptions.size());
@@ -275,6 +330,7 @@ public class HttpSinkService {
 
             if(Objects.nonNull(proxyUrlString)) {
                 httpClientBuilder.setProxy(HttpSinkUtil.getHttpHostByURL(HttpSinkUtil.getURLByUrlString(proxyUrlString)));
+                LOG.info("sending data via proxy {}",proxyUrlString);
             }
 
             final HttpAuthOptions.Builder authOptions = new HttpAuthOptions.Builder()
@@ -287,6 +343,11 @@ public class HttpSinkService {
         return authMap;
     }
 
+    /**
+     * * This method adds SageMakerHeaders as custom Header in the request
+     *  @param classicRequestBuilder ClassicRequestBuilder.
+     *  @param customHeaderOptions CustomHeaderOptions .
+     */
     private void addSageMakerHeaders(final ClassicRequestBuilder classicRequestBuilder,
                                      final CustomHeaderOptions customHeaderOptions) {
         classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES,customHeaderOptions.getCustomAttributes());
@@ -297,6 +358,10 @@ public class HttpSinkService {
         classicRequestBuilder.addHeader(X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME,customHeaderOptions.getTargetContainerHostname());
     }
 
+    /**
+     * * builds ClassicRequestBuilder based on configured HttpMethod
+     *  @param httpMethodOptions Http Method.
+     */
     private ClassicRequestBuilder buildRequestByHTTPMethodType(final HTTPMethodOptions httpMethodOptions) {
         final ClassicRequestBuilder classicRequestBuilder;
         switch(httpMethodOptions){

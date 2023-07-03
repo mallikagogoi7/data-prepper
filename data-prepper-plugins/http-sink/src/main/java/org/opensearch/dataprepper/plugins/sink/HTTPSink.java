@@ -27,7 +27,7 @@ import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.dlq.DLQSink;
+import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
@@ -57,7 +57,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private final CertificateProviderFactory certificateProviderFactory;
 
-    private final DLQSink dlqSink;
+    private HttpSinkDlqUtil httpSinkDLQService;
 
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
@@ -80,7 +80,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
 
-        this.dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
+        if(Objects.nonNull(httpSinkConfiguration.getDlq()))
+            this.httpSinkDLQService = new HttpSinkDlqUtil(pluginFactory,httpSinkConfiguration);
 
         final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
                 DEFAULT_HTTP_RETRY_INTERVAL);
@@ -95,7 +96,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 httpSinkConfiguration,
                 bufferFactory,
                 certificateProviderFactory,
-                dlqSink,
+                httpSinkDLQService,
                 codecPluginSettings,
                 webhookService,
                 httpClientBuilder,

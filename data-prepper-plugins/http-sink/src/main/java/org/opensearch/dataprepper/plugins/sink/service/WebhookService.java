@@ -26,6 +26,10 @@ public class WebhookService {
         this.url = HttpSinkUtil.getURLByUrlString(url);
     }
 
+    /**
+     * * It sends failed dlq data to configured webhook url
+     *  @param failedDlqData Failed Dlq data.
+     */
     public void pushWebhook(final FailedDlqData failedDlqData) {
         final HttpHost targetHost;
         final CloseableHttpResponse webhookResp;

@@ -11,6 +11,9 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;
 
+/**
+ * * This class handles Basic Authentication
+ */
 public class BasicAuthHttpSinkHandler implements MultiAuthHttpSinkHandler {
 
     private final HttpClientConnectionManager httpClientConnectionManager;
