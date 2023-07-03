@@ -4,11 +4,13 @@
  */
 package org.opensearch.dataprepper.plugins.sink;
 
-import com.linecorp.armeria.client.retry.Backoff;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.util.TimeValue;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
-import org.opensearch.dataprepper.model.buffer.Buffer;
 import org.opensearch.dataprepper.model.configuration.PipelineDescription;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
@@ -31,7 +33,6 @@ import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.Objects;
 
@@ -40,7 +41,9 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSink.class);
 
-    private final HttpSinkConfiguration httpSinkConfiguration;
+    public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
+
+    public static final int HTTP_MAX_RETRIES = 5;
 
     private WebhookService webhookService;
 
@@ -48,17 +51,13 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private final Codec codec;
 
-    private HttpSinkService httpSinkService;
+    private final HttpSinkService httpSinkService;
 
     private final BufferFactory bufferFactory;
-
-    private Buffer currentBuffer;
 
     private final CertificateProviderFactory certificateProviderFactory;
 
     private final DLQSink dlqSink;
-
-    private HttpClientBuilder httpClientBuilder;
 
     @DataPrepperPluginConstructor
     public HTTPSink(final PluginSetting pluginSetting,
@@ -66,23 +65,28 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                     final PluginFactory pluginFactory,
                     final PipelineDescription pipelineDescription) {
         super(pluginSetting);
-        this.httpSinkConfiguration = httpSinkConfiguration;
         final PluginModel codecConfiguration = httpSinkConfiguration.getCodec();
         final PluginSetting codecPluginSettings = new PluginSetting(codecConfiguration.getPluginName(),
                 codecConfiguration.getPluginSettings());
         codecPluginSettings.setPipelineName(pipelineDescription.getPipelineName());
-        codec = pluginFactory.loadPlugin(Codec.class, codecPluginSettings);
-        sinkInitialized = Boolean.FALSE;
+        this.codec = pluginFactory.loadPlugin(Codec.class, codecPluginSettings);
+        this.sinkInitialized = Boolean.FALSE;
         if (httpSinkConfiguration.getBufferType().equals(BufferTypeOptions.LOCALFILE)) {
-            bufferFactory = new LocalFileBufferFactory();
+            this.bufferFactory = new LocalFileBufferFactory();
         } else {
-            bufferFactory = new InMemoryBufferFactory();
+            this.bufferFactory = new InMemoryBufferFactory();
         }
 
         this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
         httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
 
-        dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
+        this.dlqSink = new DLQSink(pluginFactory,httpSinkConfiguration);
+
+        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
+                DEFAULT_HTTP_RETRY_INTERVAL);
+
+        final HttpClientBuilder httpClientBuilder = HttpClients.custom()
+                .setRetryStrategy(httpRequestRetryStrategy);
 
         if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
             this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);
@@ -93,7 +97,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 certificateProviderFactory,
                 dlqSink,
                 codecPluginSettings,
-                webhookService);
+                webhookService,
+                httpClientBuilder);
     }
 
     @Override
@@ -130,7 +135,4 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         }
         httpSinkService.output(records);
     }
-
-
-
 }

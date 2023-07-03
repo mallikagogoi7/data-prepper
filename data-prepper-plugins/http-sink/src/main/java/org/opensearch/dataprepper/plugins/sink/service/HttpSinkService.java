@@ -4,8 +4,6 @@
  */
 package org.opensearch.dataprepper.plugins.sink.service;
 
-import org.apache.hc.client5.http.HttpRequestRetryStrategy;
-import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -14,7 +12,6 @@ import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
-import org.apache.hc.core5.util.TimeValue;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
@@ -44,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,16 +55,6 @@ public class HttpSinkService {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpSinkService.class);
 
-    public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
-
-    public static final int HTTP_MAX_RETRIES = 5;
-
-    static final long INITIAL_DELAY = Duration.ofSeconds(20).toMillis();
-
-    static final long MAXIMUM_DELAY = Duration.ofMinutes(5).toMillis();
-
-    static final double JITTER_RATE = 0.20;
-
     public static final String X_AMZN_SAGE_MAKER_CUSTOM_ATTRIBUTES = "X-Amzn-SageMaker-Custom-Attributes";
 
     public static final String X_AMZN_SAGE_MAKER_INFERENCE_ID = "X-Amzn-SageMaker-Inference-Id";
@@ -80,6 +66,14 @@ public class HttpSinkService {
     public static final String X_AMZN_SAGE_MAKER_TARGET_MODEL = "X-Amzn-SageMaker-Target-Model";
 
     public static final String X_AMZN_SAGE_MAKER_TARGET_CONTAINER_HOSTNAME = "X-Amzn-SageMaker-Target-Container-Hostname";
+
+    public static final String USERNAME = "username";
+
+    public static final String PASSWORD = "password";
+
+    public static final String TOKEN = "token";
+
+    public static final String BEARER = "Bearer ";
 
     private final Codec codec;
 
@@ -96,7 +90,6 @@ public class HttpSinkService {
     private final PluginSetting pluginSetting;
 
     private final Lock reentrantLock;
-    private final CertificateProviderFactory certificateProviderFactory;
 
     private final HttpClientBuilder httpClientBuilder;
 
@@ -118,31 +111,27 @@ public class HttpSinkService {
                            final CertificateProviderFactory certificateProviderFactory,
                            final DLQSink dlqSink,
                            final PluginSetting pluginSetting,
-                           final WebhookService webhookService){
+                           final WebhookService webhookService,
+                           final HttpClientBuilder httpClientBuilder){
         this.codec= codec;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
         this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
         this.dlqSink = dlqSink;
         this.pluginSetting = pluginSetting;
-        reentrantLock = new ReentrantLock();
+        this.reentrantLock = new ReentrantLock();
         this.webhookService = webhookService;
-        this.certificateProviderFactory = certificateProviderFactory;
         this.bufferedEventHandles = new LinkedList<>();
+        this.httpClientBuilder = httpClientBuilder;
 
         this.maxEvents = httpSinkConfiguration.getThresholdOptions().getEventCount();
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
 
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
-            httpClientConnectionManager = new HttpClientSSLConnectionManager()
+            this.httpClientConnectionManager = new HttpClientSSLConnectionManager()
                     .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
         }
-        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
-                DEFAULT_HTTP_RETRY_INTERVAL);
-
-        this.httpClientBuilder = HttpClients.custom()
-                .setRetryStrategy(httpRequestRetryStrategy);
     }
 
     public void output(Collection<Record<Event>> records) {
@@ -262,10 +251,13 @@ public class HttpSinkService {
         // TODO: AWS Sigv4 - check
         switch(authType) {
             case HTTP_BASIC:
-                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
+                String username = httpSinkConfiguration.getAuthentication().getPluginSettings().get(USERNAME).toString();
+                String password = httpSinkConfiguration.getAuthentication().getPluginSettings().get(PASSWORD).toString();
+                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(username,password,httpClientConnectionManager);
                 break;
             case BEARER_TOKEN:
-                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(httpSinkConfiguration,httpClientConnectionManager);
+                String token = httpSinkConfiguration.getAuthentication().getPluginSettings().get(TOKEN).toString();
+                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(BEARER + token,httpClientConnectionManager);
                 break;
             case UNAUTHENTICATED:
             default:
