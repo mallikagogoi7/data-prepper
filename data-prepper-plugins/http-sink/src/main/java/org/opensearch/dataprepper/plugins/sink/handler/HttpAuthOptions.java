@@ -6,6 +6,7 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 
 public class HttpAuthOptions {
@@ -20,7 +21,7 @@ public class HttpAuthOptions {
 
     private int workers;
 
-    private String proxy;
+    private HttpHost proxy;
 
     public HttpClientBuilder getHttpClientBuilder() {
         return httpClientBuilder;
@@ -38,7 +39,7 @@ public class HttpAuthOptions {
         return url;
     }
 
-    public String getProxy() {
+    public HttpHost getProxy() {
         return proxy;
     }
 
@@ -61,7 +62,7 @@ public class HttpAuthOptions {
         private ClassicRequestBuilder classicHttpRequestBuilder;
         private HttpClientConnectionManager httpClientConnectionManager;
         private int workers;
-        private String proxy;
+        private HttpHost proxy;
 
         public HttpAuthOptions build() {
             return new HttpAuthOptions(this);
@@ -96,7 +97,7 @@ public class HttpAuthOptions {
             return this;
         }
 
-        public Builder setProxy(String proxy) {
+        public Builder setProxy(HttpHost proxy) {
             this.proxy = proxy;
             return this;
         }

@@ -16,8 +16,6 @@ public class HttpAuthOptions {
 
     private int workers;
 
-    private String proxy;
-
     public CloseableHttpClient getCloseableHttpClient() {
         return closeableHttpClient;
     }
@@ -51,15 +49,6 @@ public class HttpAuthOptions {
 
     public HttpAuthOptions setUrl(final String url) {
         this.url = url;
-        return this;
-    }
-
-    public String getProxy() {
-        return proxy;
-    }
-
-    public HttpAuthOptions setProxy(final String proxy) {
-        this.proxy = proxy;
         return this;
     }
 }

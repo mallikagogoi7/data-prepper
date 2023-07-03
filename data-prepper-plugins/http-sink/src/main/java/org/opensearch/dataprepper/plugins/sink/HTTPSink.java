@@ -98,7 +98,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 dlqSink,
                 codecPluginSettings,
                 webhookService,
-                httpClientBuilder);
+                httpClientBuilder,
+                pluginMetrics);
     }
 
     @Override
