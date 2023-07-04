@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 
+import java.time.Duration;
 import java.util.List;
 
 public class HttpSinkConfiguration {
@@ -30,6 +31,7 @@ public class HttpSinkConfiguration {
     static final int DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS = 120000;
     public static final String SSL_IS_ENABLED = "%s is enabled";
 
+    public static final Duration DEFAULT_HTTP_RETRY_INTERVAL = Duration.ofSeconds(30);
     @NotNull
     @JsonProperty("urls")
     private List<UrlConfigurationOption> urlConfigurationOptions;
@@ -102,10 +104,18 @@ public class HttpSinkConfiguration {
     @JsonProperty("ssl")
     private boolean ssl = DEFAULT_SSL;
 
+    @JsonProperty("http_retry_interval")
+    private Duration httpRetryInterval = DEFAULT_HTTP_RETRY_INTERVAL;
+
+
     private boolean sslCertAndKeyFileInS3;
 
     public boolean isSsl() {
         return ssl;
+    }
+
+    public Duration getHttpRetryInterval() {
+        return httpRetryInterval;
     }
 
     public String getAcmPrivateKeyPassword() {

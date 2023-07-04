@@ -6,7 +6,6 @@ package org.opensearch.dataprepper.plugins.sink.service;
 
 import io.micrometer.core.instrument.Counter;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.HttpStatus;
@@ -21,7 +20,7 @@ import org.opensearch.dataprepper.plugins.accumulator.Buffer;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.HttpEndPointResponse;
-import org.opensearch.dataprepper.plugins.sink.ThresholdCheck;
+import org.opensearch.dataprepper.plugins.sink.ThresholdValidator;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
@@ -112,6 +111,8 @@ public class HttpSinkService {
 
     private final Counter httpSinkRecordsFailedCounter;
 
+    private CertificateProviderFactory certificateProviderFactory;
+
     private WebhookService webhookService;
 
     private HttpClientConnectionManager httpClientConnectionManager;
@@ -121,7 +122,6 @@ public class HttpSinkService {
     public HttpSinkService(final Codec codec,
                            final HttpSinkConfiguration httpSinkConfiguration,
                            final BufferFactory bufferFactory,
-                           final CertificateProviderFactory certificateProviderFactory,
                            final HttpSinkDlqUtil httpSinkDlqUtil,
                            final PluginSetting pluginSetting,
                            final WebhookService webhookService,
@@ -136,15 +136,17 @@ public class HttpSinkService {
         this.webhookService = webhookService;
         this.bufferedEventHandles = new LinkedList<>();
         this.httpClientBuilder = httpClientBuilder;
-        this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
         this.maxEvents = httpSinkConfiguration.getThresholdOptions().getEventCount();
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
 
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
+            this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
+            httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
             this.httpClientConnectionManager = new HttpClientSSLConnectionManager()
                     .createHttpClientConnectionManager(httpSinkConfiguration, certificateProviderFactory);
         }
+        this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
         this.httpSinkRecordsSuccessCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_SUCCESS_COUNTER);
         this.httpSinkRecordsFailedCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_FAILED_COUNTER);
     }
@@ -168,7 +170,7 @@ public class HttpSinkService {
             if(event.getEventHandle() != null) {
                 this.bufferedEventHandles.add(event.getEventHandle());
             }
-            if(ThresholdCheck.checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)){
+            if(ThresholdValidator.checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)){
                 final List<HttpEndPointResponse> failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
                 if(!failedHttpEndPointResponses.isEmpty()) {
                     logFailedData(failedHttpEndPointResponses, getCurrentBufferData(currentBuffer));
@@ -285,7 +287,8 @@ public class HttpSinkService {
                 break;
             case UNAUTHENTICATED:
             default:
-                return authOptions.setHttpClientBuilder(HttpClients.custom()
+                return authOptions.setHttpClientBuilder(httpClientBuilder
+                        .setConnectionManager(httpClientConnectionManager)
                         .addResponseInterceptorLast(new FailedHttpResponseInterceptor(authOptions.getUrl()))).build();
         }
         return multiAuthHttpSinkHandler.authenticate(authOptions);
@@ -353,5 +356,19 @@ public class HttpSinkService {
                 break;
         }
         return classicRequestBuilder;
+    }
+
+    public static boolean checkThresholdExceed(final Buffer currentBuffer,
+                                               final int maxEvents,
+                                               final ByteCount maxBytes,
+                                               final long maxCollectionDuration) {
+        if (maxEvents > 0) {
+            return currentBuffer.getEventCount() + 1 > maxEvents ||
+                    currentBuffer.getDuration() > maxCollectionDuration ||
+                    currentBuffer.getSize() > maxBytes.getBytes();
+        } else {
+            return currentBuffer.getDuration() > maxCollectionDuration ||
+                    currentBuffer.getSize() > maxBytes.getBytes();
+        }
     }
 }

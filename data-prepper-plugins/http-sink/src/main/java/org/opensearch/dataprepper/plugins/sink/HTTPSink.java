@@ -24,7 +24,6 @@ import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
-import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
@@ -41,10 +40,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSink.class);
 
-    public static final TimeValue DEFAULT_HTTP_RETRY_INTERVAL = TimeValue.ofSeconds(30);
-
-    public static final int HTTP_MAX_RETRIES = 5;
-
     private WebhookService webhookService;
 
     private volatile boolean sinkInitialized;
@@ -54,8 +49,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     private final HttpSinkService httpSinkService;
 
     private final BufferFactory bufferFactory;
-
-    private final CertificateProviderFactory certificateProviderFactory;
 
     private HttpSinkDlqUtil httpSinkDLQService;
 
@@ -77,14 +70,11 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             this.bufferFactory = new InMemoryBufferFactory();
         }
 
-        this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
-        httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
-
         if(Objects.nonNull(httpSinkConfiguration.getDlq()))
             this.httpSinkDLQService = new HttpSinkDlqUtil(pluginFactory,httpSinkConfiguration);
 
-        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(HTTP_MAX_RETRIES,
-                DEFAULT_HTTP_RETRY_INTERVAL);
+        final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(httpSinkConfiguration.getMaxUploadRetries(),
+                TimeValue.of(httpSinkConfiguration.getHttpRetryInterval()));
 
         final HttpClientBuilder httpClientBuilder = HttpClients.custom()
                 .setRetryStrategy(httpRequestRetryStrategy);
@@ -95,7 +85,6 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         this.httpSinkService = new HttpSinkService(codec,
                 httpSinkConfiguration,
                 bufferFactory,
-                certificateProviderFactory,
                 httpSinkDLQService,
                 codecPluginSettings,
                 webhookService,
