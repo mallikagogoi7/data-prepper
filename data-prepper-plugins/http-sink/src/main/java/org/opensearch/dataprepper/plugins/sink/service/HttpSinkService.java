@@ -153,7 +153,7 @@ public class HttpSinkService {
 
     /**
      * This method process buffer records and send to Http End points based on configured codec
-     * @param records Collection<Record<Event>>
+     * @param records Collection of Event
      */
     public void output(Collection<Record<Event>> records) {
         reentrantLock.lock();
@@ -179,7 +179,7 @@ public class HttpSinkService {
                 }
                 currentBuffer = bufferFactory.getBuffer();
                 releaseEventHandles(Boolean.TRUE);
-                }
+            }
         });
         reentrantLock.unlock();
     }
@@ -356,19 +356,5 @@ public class HttpSinkService {
                 break;
         }
         return classicRequestBuilder;
-    }
-
-    public static boolean checkThresholdExceed(final Buffer currentBuffer,
-                                               final int maxEvents,
-                                               final ByteCount maxBytes,
-                                               final long maxCollectionDuration) {
-        if (maxEvents > 0) {
-            return currentBuffer.getEventCount() + 1 > maxEvents ||
-                    currentBuffer.getDuration() > maxCollectionDuration ||
-                    currentBuffer.getSize() > maxBytes.getBytes();
-        } else {
-            return currentBuffer.getDuration() > maxCollectionDuration ||
-                    currentBuffer.getSize() > maxBytes.getBytes();
-        }
     }
 }

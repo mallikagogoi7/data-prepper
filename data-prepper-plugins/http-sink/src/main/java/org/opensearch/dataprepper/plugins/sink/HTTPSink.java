@@ -29,6 +29,7 @@ import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfigurati
 import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
 import org.opensearch.dataprepper.plugins.sink.service.HttpSinkService;
 import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
