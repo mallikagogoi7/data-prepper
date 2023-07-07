@@ -8,8 +8,11 @@ import io.micrometer.core.instrument.Counter;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.HttpRequestInterceptor;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.opensearch.dataprepper.aws.api.AwsCredentialsOptions;
+import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
@@ -18,6 +21,7 @@ import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.types.ByteCount;
 import org.opensearch.dataprepper.plugins.accumulator.Buffer;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
+import org.opensearch.dataprepper.plugins.sink.AwsRequestSigningApacheInterceptor;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.HttpEndPointResponse;
 import org.opensearch.dataprepper.plugins.sink.ThresholdValidator;
@@ -38,6 +42,8 @@ import org.opensearch.dataprepper.plugins.sink.handler.MultiAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.signer.Aws4Signer;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -82,6 +88,8 @@ public class HttpSinkService {
     public static final String BEARER = "Bearer ";
     public static final String HTTP_SINK_RECORDS_SUCCESS_COUNTER = "httpSinkRecordsSuccessPushToEndPoint";
     public static final String HTTP_SINK_RECORDS_FAILED_COUNTER = "httpSinkRecordsFailedToPushEndPoint";
+    public static final String AWS_SIGV4 = "aws_sigv4";
+    private static final String AOS_SERVICE_NAME = "es";
 
     private final Codec codec;
 
@@ -110,6 +118,7 @@ public class HttpSinkService {
     private final Counter httpSinkRecordsSuccessCounter;
 
     private final Counter httpSinkRecordsFailedCounter;
+    private final AwsCredentialsSupplier awsCredentialsSupplier;
 
     private CertificateProviderFactory certificateProviderFactory;
 
@@ -126,8 +135,10 @@ public class HttpSinkService {
                            final PluginSetting pluginSetting,
                            final WebhookService webhookService,
                            final HttpClientBuilder httpClientBuilder,
-                           final PluginMetrics pluginMetrics){
+                           final PluginMetrics pluginMetrics,
+                           final AwsCredentialsSupplier awsCredentialsSupplier){
         this.codec= codec;
+        this.awsCredentialsSupplier = awsCredentialsSupplier;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
         this.httpSinkDlqUtil = httpSinkDlqUtil;
@@ -225,6 +236,12 @@ public class HttpSinkService {
             final ClassicRequestBuilder classicHttpRequestBuilder =
                     httpAuthOptions.get(urlConfOption.getUrl()).getClassicHttpRequestBuilder();
             classicHttpRequestBuilder.setEntity(new String(currentBufferData));
+
+            if(httpSinkConfiguration.isAwsSigv4()){
+               HttpRequestInterceptor httpRequestInterceptor = attachSigV4(httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder(),awsCredentialsSupplier);
+                httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder()
+                        .addRequestInterceptorLast(httpRequestInterceptor);
+            }
             try {
                 httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().build()
                         .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
@@ -356,5 +373,26 @@ public class HttpSinkService {
                 break;
         }
         return classicRequestBuilder;
+    }
+
+    private HttpRequestInterceptor attachSigV4(final HttpClientBuilder httpClientBuilder, AwsCredentialsSupplier awsCredentialsSupplier) {
+        //if aws signing is enabled we will add AWSRequestSigningApacheInterceptor interceptor,
+        //if not follow regular credentials process
+        LOG.info("{} is set, will sign requests using AWSRequestSigningApacheInterceptor", AWS_SIGV4);
+        final Aws4Signer aws4Signer = Aws4Signer.create();
+        final AwsCredentialsOptions awsCredentialsOptions = createAwsCredentialsOptions();
+        final AwsCredentialsProvider credentialsProvider = awsCredentialsSupplier.getProvider(awsCredentialsOptions);
+        return new AwsRequestSigningApacheInterceptor(AOS_SERVICE_NAME, aws4Signer,
+                credentialsProvider, httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion());
+    }
+
+    private AwsCredentialsOptions createAwsCredentialsOptions() {
+        final AwsCredentialsOptions awsCredentialsOptions = AwsCredentialsOptions.builder()
+                .withStsRoleArn(httpSinkConfiguration.getAwsAuthenticationOptions().getAwsStsRoleArn())
+                .withStsExternalId(httpSinkConfiguration.getAwsAuthenticationOptions().getAwsStsExternalId())
+                .withRegion(httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion())
+                .withStsHeaderOverrides(httpSinkConfiguration.getAwsAuthenticationOptions().getAwsStsHeaderOverrides())
+                .build();
+        return awsCredentialsOptions;
     }
 }

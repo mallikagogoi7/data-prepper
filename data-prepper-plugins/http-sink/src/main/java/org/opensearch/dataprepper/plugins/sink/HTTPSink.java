@@ -9,6 +9,7 @@ import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.util.TimeValue;
+import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.configuration.PipelineDescription;
@@ -40,6 +41,7 @@ import java.util.Objects;
 public class HTTPSink extends AbstractSink<Record<Event>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSink.class);
+    private final AwsCredentialsSupplier awsCredentialsSupplier;
 
     private WebhookService webhookService;
 
@@ -57,8 +59,10 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
     public HTTPSink(final PluginSetting pluginSetting,
                     final HttpSinkConfiguration httpSinkConfiguration,
                     final PluginFactory pluginFactory,
-                    final PipelineDescription pipelineDescription) {
+                    final PipelineDescription pipelineDescription,
+                    final AwsCredentialsSupplier awsCredentialsSupplier) {
         super(pluginSetting);
+        this.awsCredentialsSupplier = awsCredentialsSupplier;
         final PluginModel codecConfiguration = httpSinkConfiguration.getCodec();
         final PluginSetting codecPluginSettings = new PluginSetting(codecConfiguration.getPluginName(),
                 codecConfiguration.getPluginSettings());
@@ -90,7 +94,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 codecPluginSettings,
                 webhookService,
                 httpClientBuilder,
-                pluginMetrics);
+                pluginMetrics,
+                awsCredentialsSupplier);
     }
 
     @Override
