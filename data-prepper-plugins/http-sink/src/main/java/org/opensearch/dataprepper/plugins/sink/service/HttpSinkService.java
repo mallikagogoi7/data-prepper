@@ -236,15 +236,11 @@ public class HttpSinkService {
             final ClassicRequestBuilder classicHttpRequestBuilder =
                     httpAuthOptions.get(urlConfOption.getUrl()).getClassicHttpRequestBuilder();
             classicHttpRequestBuilder.setEntity(new String(currentBufferData));
-
-            if(httpSinkConfiguration.isAwsSigv4()){
-               HttpRequestInterceptor httpRequestInterceptor = attachSigV4(httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder(),awsCredentialsSupplier);
-                httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder()
-                        .addRequestInterceptorLast(httpRequestInterceptor);
-            }
             try {
                 httpAuthOptions.get(urlConfOption.getUrl()).getHttpClientBuilder().build()
                         .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
+                LOG.info("No of Records successfully pushed to endpoint {}",currentBuffer.getEventCount());
+                httpSinkRecordsSuccessCounter.increment(currentBuffer.getEventCount());
             } catch (IOException e) {
                 httpSinkRecordsFailedCounter.increment(currentBuffer.getEventCount());
                 LOG.info("No of Records failed to push endpoint {}",currentBuffer.getEventCount());
@@ -252,8 +248,6 @@ public class HttpSinkService {
                 httpEndPointResponses.add(new HttpEndPointResponse(urlConfOption.getUrl(), HttpStatus.SC_INTERNAL_SERVER_ERROR, e.getMessage()));
             }
         });
-        LOG.info("No of Records successfully pushed to endpoint {}",currentBuffer.getEventCount());
-        httpSinkRecordsSuccessCounter.increment(currentBuffer.getEventCount());
         return httpEndPointResponses;
     }
 
@@ -263,10 +257,9 @@ public class HttpSinkService {
      */
     private void logFailureForDlqObjects(final FailedDlqData failedDlqData){
         if(httpSinkConfiguration.getDlqFile() != null)
-            try {
-                BufferedWriter dlqFileWriter = Files.newBufferedWriter(Paths.get(httpSinkConfiguration.getDlqFile()), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            try(BufferedWriter dlqFileWriter = Files.newBufferedWriter(Paths.get(httpSinkConfiguration.getDlqFile()),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
                 dlqFileWriter.write(failedDlqData.toString());
-                dlqFileWriter.close();
             }catch (IOException e) {
                 LOG.error("Exception while writing failed data to DLQ file Exception: ",e);
             }
@@ -291,7 +284,6 @@ public class HttpSinkService {
     private HttpAuthOptions getAuthHandlerByConfig(final AuthTypeOptions authType,
                                                    final HttpAuthOptions.Builder authOptions){
         MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
-        // TODO: AWS Sigv4 - check
         switch(authType) {
             case HTTP_BASIC:
                 String username = httpSinkConfiguration.getAuthentication().getPluginSettings().get(USERNAME).toString();
@@ -323,6 +315,12 @@ public class HttpSinkService {
             final AuthTypeOptions authType = Objects.nonNull(urlOption.getAuthType()) ? urlOption.getAuthType() : httpSinkConfiguration.getAuthType();
             final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
             final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethod).setUri(urlOption.getUrl());
+
+            if(httpSinkConfiguration.isAwsSigv4()){
+                HttpRequestInterceptor httpRequestInterceptor = attachSigV4(httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder(),awsCredentialsSupplier);
+                httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder()
+                        .addRequestInterceptorLast(httpRequestInterceptor);
+            }
 
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
                 addSageMakerHeaders(classicRequestBuilder,httpSinkConfiguration.getCustomHeaderOptions());
@@ -375,7 +373,8 @@ public class HttpSinkService {
         return classicRequestBuilder;
     }
 
-    private HttpRequestInterceptor attachSigV4(final HttpClientBuilder httpClientBuilder, AwsCredentialsSupplier awsCredentialsSupplier) {
+    private HttpRequestInterceptor attachSigV4(final HttpClientBuilder httpClientBuilder,
+                                               final AwsCredentialsSupplier awsCredentialsSupplier) {
         //if aws signing is enabled we will add AWSRequestSigningApacheInterceptor interceptor,
         //if not follow regular credentials process
         LOG.info("{} is set, will sign requests using AWSRequestSigningApacheInterceptor", AWS_SIGV4);

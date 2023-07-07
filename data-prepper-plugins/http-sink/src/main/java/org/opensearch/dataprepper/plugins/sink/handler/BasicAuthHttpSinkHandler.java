@@ -7,6 +7,7 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;

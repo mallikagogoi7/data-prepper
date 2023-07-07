@@ -85,7 +85,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 .setRetryStrategy(httpRequestRetryStrategy);
 
         if(Objects.nonNull(httpSinkConfiguration.getWebhookURL()))
-            this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),httpClientBuilder);
+            this.webhookService = new WebhookService(httpSinkConfiguration.getWebhookURL(),
+                    httpClientBuilder,pluginMetrics,httpSinkConfiguration);
 
         this.httpSinkService = new HttpSinkService(codec,
                 httpSinkConfiguration,
