@@ -47,6 +47,7 @@ import software.amazon.awssdk.auth.signer.Aws4Signer;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -89,7 +90,7 @@ public class HttpSinkService {
     public static final String HTTP_SINK_RECORDS_SUCCESS_COUNTER = "httpSinkRecordsSuccessPushToEndPoint";
     public static final String HTTP_SINK_RECORDS_FAILED_COUNTER = "httpSinkRecordsFailedToPushEndPoint";
     public static final String AWS_SIGV4 = "aws_sigv4";
-    private static final String AOS_SERVICE_NAME = "es";
+    private static final String AOS_SERVICE_NAME = "http-endpoint";
 
     private final Codec codec;
 
@@ -316,10 +317,14 @@ public class HttpSinkService {
             final String proxyUrlString =  Objects.nonNull(urlOption.getProxy()) ? urlOption.getProxy() : httpSinkConfiguration.getProxy();
             final ClassicRequestBuilder classicRequestBuilder = buildRequestByHTTPMethodType(httpMethod).setUri(urlOption.getUrl());
 
-            if(httpSinkConfiguration.isAwsSigv4()){
-                HttpRequestInterceptor httpRequestInterceptor = attachSigV4(httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder(),awsCredentialsSupplier);
-                httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder()
-                        .addRequestInterceptorLast(httpRequestInterceptor);
+            try {
+                if(httpSinkConfiguration.isAwsSigv4() && urlOption.isValidAWSUrl()){
+                    HttpRequestInterceptor httpRequestInterceptor = attachSigV4(httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder(),awsCredentialsSupplier);
+                    httpAuthOptions.get(urlOption.getUrl()).getHttpClientBuilder()
+                            .addRequestInterceptorLast(httpRequestInterceptor);
+                }
+            } catch (MalformedURLException e) {
+                LOG.error("Thr url is not in a valid form {} " , urlOption.getUrl());
             }
 
             if(Objects.nonNull(httpSinkConfiguration.getCustomHeaderOptions()))
@@ -375,8 +380,6 @@ public class HttpSinkService {
 
     private HttpRequestInterceptor attachSigV4(final HttpClientBuilder httpClientBuilder,
                                                final AwsCredentialsSupplier awsCredentialsSupplier) {
-        //if aws signing is enabled we will add AWSRequestSigningApacheInterceptor interceptor,
-        //if not follow regular credentials process
         LOG.info("{} is set, will sign requests using AWSRequestSigningApacheInterceptor", AWS_SIGV4);
         final Aws4Signer aws4Signer = Aws4Signer.create();
         final AwsCredentialsOptions awsCredentialsOptions = createAwsCredentialsOptions();
