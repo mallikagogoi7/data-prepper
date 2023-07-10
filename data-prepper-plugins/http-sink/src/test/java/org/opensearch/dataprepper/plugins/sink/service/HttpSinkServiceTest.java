@@ -1,3 +1,7 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package org.opensearch.dataprepper.plugins.sink.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -142,7 +146,6 @@ public class HttpSinkServiceTest {
     }
 
     HttpSinkService createObjectUnderTest(final int eventCount,final HttpSinkConfiguration httpSinkConfig) throws NoSuchFieldException, IllegalAccessException {
-//        this.bufferFactory = new InMemoryBufferFactory();
         ReflectivelySetField.setField(ThresholdOptions.class,httpSinkConfig.getThresholdOptions(),"eventCollectTimeOut", Duration.ofNanos(1));
         ReflectivelySetField.setField(ThresholdOptions.class,httpSinkConfig.getThresholdOptions(),"eventCount", eventCount);
         return new HttpSinkService(codec,
@@ -246,7 +249,4 @@ public class HttpSinkServiceTest {
         objectUnderTest.output(List.of(new Record<>(event)));
         verify(httpSinkRecordsSuccessCounter).increment(1);
     }
-
-
-
 }
