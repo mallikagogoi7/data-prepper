@@ -17,9 +17,9 @@ public class UrlConfigurationOption {
 
     private static final String HTTPS = "https";
 
-    private static final String AWS_HOST_CHECK1 = "amazonaws.com";
+    private static final String AWS_HOST_AMAZONAWS_COM = "amazonaws.com";
 
-    private static final String AWS_HOST_CHECK2 = "api.aws";
+    private static final String AWS_HOST_API_AWS = "api.aws";
 
 
     @NotNull
@@ -67,7 +67,7 @@ public class UrlConfigurationOption {
 
     public boolean isValidAWSUrl() throws MalformedURLException {
         URL parsedUrl = new URL(url);
-        if(parsedUrl.getProtocol().equals(HTTPS) && (parsedUrl.getHost().contains(AWS_HOST_CHECK1) ||parsedUrl.getHost().contains(AWS_HOST_CHECK2))){
+        if(parsedUrl.getProtocol().equals(HTTPS) && (parsedUrl.getHost().contains(AWS_HOST_AMAZONAWS_COM) ||parsedUrl.getHost().contains(AWS_HOST_API_AWS))){
             return true;
         }
         return false;
