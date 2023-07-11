@@ -14,6 +14,7 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsOptions;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
+import org.opensearch.dataprepper.model.codec.OutputCodec;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
@@ -31,9 +32,8 @@ import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.codec.Codec;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
-import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
+import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.plugins.sink.dlq.FailedDlqData;
 import org.opensearch.dataprepper.plugins.sink.handler.BasicAuthHttpSinkHandler;
 import org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler;
@@ -45,12 +45,9 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -92,7 +89,7 @@ public class HttpSinkService {
     public static final String AWS_SIGV4 = "aws_sigv4";
     private static final String AOS_SERVICE_NAME = "http-endpoint";
 
-    private final Codec codec;
+    private final OutputCodec codec;
 
     private final Collection<EventHandle> bufferedEventHandles;
 
@@ -102,7 +99,7 @@ public class HttpSinkService {
 
     private final Map<String,HttpAuthOptions> httpAuthOptions;
 
-    private final HttpSinkDlqUtil httpSinkDlqUtil;
+    private final DlqPushHandler dlqPushHandler;
 
     private final PluginSetting pluginSetting;
 
@@ -129,20 +126,23 @@ public class HttpSinkService {
 
     private Buffer currentBuffer;
 
-    public HttpSinkService(final Codec codec,
+    private final String tagsTargetKey;
+
+    public HttpSinkService(final OutputCodec codec,
                            final HttpSinkConfiguration httpSinkConfiguration,
                            final BufferFactory bufferFactory,
-                           final HttpSinkDlqUtil httpSinkDlqUtil,
+                           final DlqPushHandler dlqPushHandler,
                            final PluginSetting pluginSetting,
                            final WebhookService webhookService,
                            final HttpClientBuilder httpClientBuilder,
                            final PluginMetrics pluginMetrics,
-                           final AwsCredentialsSupplier awsCredentialsSupplier){
+                           final AwsCredentialsSupplier awsCredentialsSupplier,
+                           final String tagsTargetKey ){
         this.codec= codec;
         this.awsCredentialsSupplier = awsCredentialsSupplier;
         this.httpSinkConfiguration = httpSinkConfiguration;
         this.bufferFactory = bufferFactory;
-        this.httpSinkDlqUtil = httpSinkDlqUtil;
+        this.dlqPushHandler = dlqPushHandler;
         this.pluginSetting = pluginSetting;
         this.reentrantLock = new ReentrantLock();
         this.webhookService = webhookService;
@@ -161,6 +161,7 @@ public class HttpSinkService {
         this.httpAuthOptions = buildAuthHttpSinkObjectsByConfig(httpSinkConfiguration);
         this.httpSinkRecordsSuccessCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_SUCCESS_COUNTER);
         this.httpSinkRecordsFailedCounter = pluginMetrics.counter(HTTP_SINK_RECORDS_FAILED_COUNTER);
+        this.tagsTargetKey = tagsTargetKey;
     }
 
     /**
@@ -172,17 +173,29 @@ public class HttpSinkService {
         if (currentBuffer == null) {
             this.currentBuffer = bufferFactory.getBuffer();
         }
+        OutputStream outputStream = currentBuffer.getOutputStream();
         records.forEach(record -> {
+
             final Event event = record.getData();
             try {
-                currentBuffer.writeEvent(event.toJsonString().getBytes());
+                if(currentBuffer.getEventCount() == 0) {
+                    codec.start(outputStream);
+                }
+                codec.writeEvent(event, outputStream, tagsTargetKey);
+                int count = currentBuffer.getEventCount() +1;
+                currentBuffer.setEventCount(count);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                LOG.error("Exception while write event into buffer :", e);
             }
             if(event.getEventHandle() != null) {
                 this.bufferedEventHandles.add(event.getEventHandle());
             }
             if(ThresholdValidator.checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)){
+                try {
+                    codec.complete(outputStream);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
                 final List<HttpEndPointResponse> failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
                 if(!failedHttpEndPointResponses.isEmpty()) {
                     logFailedData(failedHttpEndPointResponses, getCurrentBufferData(currentBuffer));
@@ -257,16 +270,7 @@ public class HttpSinkService {
      *  @param failedDlqData FailedDlqData.
      */
     private void logFailureForDlqObjects(final FailedDlqData failedDlqData){
-        if(httpSinkConfiguration.getDlqFile() != null)
-            try(BufferedWriter dlqFileWriter = Files.newBufferedWriter(Paths.get(httpSinkConfiguration.getDlqFile()),
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-                dlqFileWriter.write(failedDlqData.toString());
-            }catch (IOException e) {
-                LOG.error("Exception while writing failed data to DLQ file Exception: ",e);
-            }
-        else {
-            httpSinkDlqUtil.perform(pluginSetting, failedDlqData);
-        }
+        dlqPushHandler.perform(pluginSetting, failedDlqData);
     }
 
     /**

@@ -106,4 +106,14 @@ public class LocalFileBuffer implements Buffer {
             }
         }
     }
+
+    @Override
+    public void setEventCount(int eventCount) {
+        this.eventCount = eventCount;
+    }
+
+    @Override
+    public OutputStream getOutputStream() {
+        return outputStream;
+    }
 }

@@ -13,8 +13,6 @@ import org.opensearch.dataprepper.model.plugin.PluginFactory;
 import org.opensearch.dataprepper.plugins.dlq.DlqProvider;
 import org.opensearch.dataprepper.plugins.dlq.DlqWriter;
 import org.opensearch.dataprepper.plugins.sink.configuration.AwsAuthenticationOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import software.amazon.awssdk.regions.Region;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -23,7 +21,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
-public class HttpSinkDlqUtilTest {
+public class DlqPushHandlerTest {
 
     private static final String BUCKET = "bucket";
     private static final String BUCKET_VALUE = "test";
@@ -37,14 +35,14 @@ public class HttpSinkDlqUtilTest {
 
     private static final String PIPELINE_NAME = "log-pipeline";
 
+    private static final String DLQ_FILE = "local_dlq_file";
+
     private PluginModel pluginModel;
 
-    private HttpSinkDlqUtil httpSinkDlqUtil;
+    private DlqPushHandler dlqPushHandler;
     private PluginFactory pluginFactory;
 
     private AwsAuthenticationOptions awsAuthenticationOptions;
-
-    private HttpSinkConfiguration httpSinkConfiguration;
 
     private DlqProvider dlqProvider;
 
@@ -52,36 +50,41 @@ public class HttpSinkDlqUtilTest {
 
     @BeforeEach
     public void setUp() throws Exception{
-        pluginFactory = mock(PluginFactory.class);
-        httpSinkConfiguration = mock(HttpSinkConfiguration.class);
-        pluginModel = mock(PluginModel.class);
-        awsAuthenticationOptions =  mock(AwsAuthenticationOptions.class);
-        dlqProvider = mock(DlqProvider.class);
-        dlqWriter = mock(DlqWriter.class);
+        this.pluginFactory = mock(PluginFactory.class);
+        this.pluginModel = mock(PluginModel.class);
+        this.awsAuthenticationOptions =  mock(AwsAuthenticationOptions.class);
+        this.dlqProvider = mock(DlqProvider.class);
+        this.dlqWriter = mock(DlqWriter.class);
     }
 
     @Test
-    public void performTest() throws IOException {
+    public void perform_for_dlq_s3_success() throws IOException {
         Map<String, Object> props = new HashMap<>();
         props.put(BUCKET,BUCKET_VALUE);
         props.put(KEY_PATH_PREFIX,KEY_PATH_PREFIX_VALUE);
 
-        when(pluginModel.getPluginSettings()).thenReturn(props);
-        when(httpSinkConfiguration.getDlq()).thenReturn(pluginModel);
-        when(awsAuthenticationOptions.getAwsStsRoleArn()).thenReturn(ROLE);
-        when(awsAuthenticationOptions.getAwsRegion()).thenReturn(Region.of(REGION));
-        when(httpSinkConfiguration.getAwsAuthenticationOptions()).thenReturn(awsAuthenticationOptions);
-        when(httpSinkConfiguration.getDlq()).thenReturn(pluginModel);
         when(pluginFactory.loadPlugin(any(Class.class), any(PluginSetting.class))).thenReturn(dlqProvider);
 
         when(dlqProvider.getDlqWriter(Mockito.anyString())).thenReturn(Optional.of(dlqWriter));
         doNothing().when(dlqWriter).write(anyList(), anyString(), anyString());
         FailedDlqData failedDlqData = FailedDlqData.builder().build();
-        httpSinkDlqUtil = new HttpSinkDlqUtil(pluginFactory, httpSinkConfiguration);
+        dlqPushHandler = new DlqPushHandler(null,pluginFactory, BUCKET_VALUE, ROLE, REGION,KEY_PATH_PREFIX_VALUE);
 
         PluginSetting pluginSetting = new PluginSetting(S3_PLUGIN_NAME, props);
         pluginSetting.setPipelineName(PIPELINE_NAME);
-        httpSinkDlqUtil.perform(pluginSetting, failedDlqData);
+        dlqPushHandler.perform(pluginSetting, failedDlqData);
         verify(dlqWriter).write(anyList(), anyString(), anyString());
+    }
+
+
+    @Test
+    public void perform_for_dlq_local_file_success(){
+
+        FailedDlqData failedDlqData = FailedDlqData.builder().build();
+        dlqPushHandler = new DlqPushHandler(DLQ_FILE,pluginFactory,null, ROLE, REGION,null);
+
+        PluginSetting pluginSetting = new PluginSetting(S3_PLUGIN_NAME, null);
+        pluginSetting.setPipelineName(PIPELINE_NAME);
+        dlqPushHandler.perform(pluginSetting, failedDlqData);
     }
 }

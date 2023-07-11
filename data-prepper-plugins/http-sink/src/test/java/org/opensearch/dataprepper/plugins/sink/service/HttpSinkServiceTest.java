@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
+import org.opensearch.dataprepper.model.codec.OutputCodec;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
@@ -28,14 +29,12 @@ import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
-import org.opensearch.dataprepper.plugins.sink.codec.Codec;
-import org.opensearch.dataprepper.plugins.sink.codec.JsonCodec;
 import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.configuration.ThresholdOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
-import org.opensearch.dataprepper.plugins.sink.dlq.HttpSinkDlqUtil;
+import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.test.helper.ReflectivelySetField;
 
 import java.io.IOException;
@@ -94,13 +93,13 @@ public class HttpSinkServiceTest {
             "        max_retries: 5\n" +
             "        aws_sigv4: false\n";
 
-    private Codec codec;
+    private OutputCodec codec;
 
     private HttpSinkConfiguration httpSinkConfiguration;
 
     private BufferFactory bufferFactory;
 
-    private HttpSinkDlqUtil httpSinkDlqUtil;
+    private DlqPushHandler dlqPushHandler;
 
     private PluginSetting pluginSetting;
 
@@ -120,12 +119,14 @@ public class HttpSinkServiceTest {
 
     private CloseableHttpResponse closeableHttpResponse;
 
+    private String tagsTargetKey;
+
     @BeforeEach
     void setup() throws IOException {
-        this.codec = mock(JsonCodec.class);
+        this.codec = mock(OutputCodec.class);
         this.pluginMetrics = mock(PluginMetrics.class);
         this.httpSinkConfiguration = objectMapper.readValue(SINK_YAML,HttpSinkConfiguration.class);
-        this.httpSinkDlqUtil = mock(HttpSinkDlqUtil.class);
+        this.dlqPushHandler = mock(DlqPushHandler.class);
         this.pluginSetting = mock(PluginSetting.class);
         this.webhookService = mock(WebhookService.class);
         this.httpClientBuilder = mock(HttpClientBuilder.class);
@@ -151,12 +152,13 @@ public class HttpSinkServiceTest {
         return new HttpSinkService(codec,
                 httpSinkConfig,
                 bufferFactory,
-                httpSinkDlqUtil,
+                dlqPushHandler,
                 pluginSetting,
                 webhookService,
                 httpClientBuilder,
                 pluginMetrics,
-                awsCredentialsSupplier);
+                awsCredentialsSupplier,
+                tagsTargetKey);
     }
 
     @Test
