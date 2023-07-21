@@ -10,25 +10,24 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
+import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.types.ByteCount;
 import software.amazon.awssdk.regions.Region;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
 public class HttpSinkConfigurationTest {
 
-    private static final String SINK_YAML = "        urls:\n" +
-            "        - url: \"https://httpbin.org/post\"\n" +
-            "          workers: 1\n" +
-            "          proxy: test\n" +
-            "          codec:\n" +
-            "            ndjson:\n" +
-            "          http_method: \"POST\"\n" +
-            "          auth_type: \"http_basic\"\n" +
+    private static final String SINK_YAML =
+            "        url: \"https://httpbin.org/post\"\n" +
             "        proxy: test-proxy\n" +
             "        codec:\n" +
             "          ndjson:\n" +
@@ -41,8 +40,13 @@ public class HttpSinkConfigurationTest {
             "          bearer_token:\n" +
             "            token: \"\"\n" +
             "        ssl: false\n" +
+            "        use_acm_cert_for_ssl: false\n"+
+            "        acm_certificate_arn: acm_cert\n" +
             "        dlq_file: \"/your/local/dlq-file\"\n" +
             "        dlq:\n" +
+            "          s3:\n" +
+            "            bucket: dlq.test\n" +
+            "            key_path_prefix: \\dlq\"\n" +
             "        ssl_certificate_file: \"/full/path/to/certfile.crt\"\n" +
             "        ssl_key_file: \"/full/path/to/keyfile.key\"\n" +
             "        buffer_type: \"in_memory\"\n" +
@@ -56,6 +60,7 @@ public class HttpSinkConfigurationTest {
             "          maximum_size: 2mb\n" +
             "        max_retries: 5\n" +
             "        aws_sigv4: true\n" +
+            "        webhook_url: \"http://localhost:8080/webhook\"\n" +
             "        custom_header:\n" +
             "          X-Amzn-SageMaker-Custom-Attributes: test-attribute\n" +
             "          X-Amzn-SageMaker-Target-Model: test-target-model\n" +
@@ -93,8 +98,8 @@ public class HttpSinkConfigurationTest {
     }
 
     @Test
-    void get_urls_test() {
-        assertThat(new HttpSinkConfiguration().getUrlConfigurationOptions(), equalTo(null));
+    void get_url_test() {
+        assertThat(new HttpSinkConfiguration().getUrl(), equalTo(null));
     }
 
     @Test
@@ -148,6 +153,19 @@ public class HttpSinkConfigurationTest {
     }
 
     @Test
+    void get_http_retry_interval_test() {
+        assertThat(new HttpSinkConfiguration().getHttpRetryInterval(),equalTo(HttpSinkConfiguration.DEFAULT_HTTP_RETRY_INTERVAL));
+    }
+    @Test
+    void get_acm_private_key_password_test() {assertNull(new HttpSinkConfiguration().getAcmPrivateKeyPassword());}
+
+    @Test
+    void get_is_ssl_cert_and_key_file_in_s3_test() {assertThat(new HttpSinkConfiguration().isSslCertAndKeyFileInS3(), equalTo(false));}
+
+    @Test
+    void get_acm_cert_issue_time_out_millis_test() {assertThat(new HttpSinkConfiguration().getAcmCertIssueTimeOutMillis(), equalTo(new Long(HttpSinkConfiguration.DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS)));}
+
+    @Test
     void http_sink_pipeline_test_with_provided_config_options() throws JsonProcessingException {
         final HttpSinkConfiguration httpSinkConfiguration = objectMapper.readValue(SINK_YAML, HttpSinkConfiguration.class);
 
@@ -158,14 +176,10 @@ public class HttpSinkConfigurationTest {
         assertThat(httpSinkConfiguration.getProxy(),equalTo("test-proxy"));
         assertThat(httpSinkConfiguration.getSslCertificateFile(),equalTo("/full/path/to/certfile.crt"));
         assertThat(httpSinkConfiguration.getSslKeyFile(),equalTo("/full/path/to/keyfile.key"));
+        assertThat(httpSinkConfiguration.getAcmCertificateArn(),equalTo("acm_cert"));
         assertThat(httpSinkConfiguration.getWorkers(),equalTo(1));
         assertThat(httpSinkConfiguration.getDlqFile(),equalTo("/your/local/dlq-file"));
-
-        final UrlConfigurationOption urlConfigurationOption = httpSinkConfiguration.getUrlConfigurationOptions().get(0);
-        assertThat(urlConfigurationOption.getUrl(),equalTo("https://httpbin.org/post"));
-        assertThat(urlConfigurationOption.getHttpMethod(),equalTo(HTTPMethodOptions.POST));
-        assertThat(urlConfigurationOption.getProxy(),equalTo("test"));
-        assertThat(urlConfigurationOption.getAuthType(),equalTo(AuthTypeOptions.HTTP_BASIC));
+        assertThat(httpSinkConfiguration.getWebhookURL(),equalTo("http://localhost:8080/webhook"));
 
         final CustomHeaderOptions customHeaderOptions = httpSinkConfiguration.getCustomHeaderOptions();
 
@@ -187,5 +201,55 @@ public class HttpSinkConfigurationTest {
         final ThresholdOptions thresholdOptions = httpSinkConfiguration.getThresholdOptions();
         assertThat(thresholdOptions.getEventCount(),equalTo(2000));
         assertThat(thresholdOptions.getMaximumSize(),instanceOf(ByteCount.class));
+
+        Map<String, Object> pluginSettings = new HashMap<>();
+        pluginSettings.put("bucket", "dlq.test");
+        pluginSettings.put("key_path_prefix", "dlq");
+        final PluginModel pluginModel = new PluginModel("s3", pluginSettings);
+        assertThat(httpSinkConfiguration.getDlq(), instanceOf(PluginModel.class));
+    }
+
+    @Test
+    public void validate_and_initialize_cert_and_key_file_in_s3_test() throws JsonProcessingException {
+         final String SINK_YAML =
+                "        url: \"https://httpbin.org/post\"\n" +
+                        "        http_method: \"POST\"\n" +
+                        "        auth_type: \"http_basic\"\n" +
+                        "        authentication:\n" +
+                        "          http_basic:\n" +
+                        "            username: \"username\"\n" +
+                        "            password: \"vip\"\n" +
+                        "        ssl: true\n" +
+                        "        use_acm_cert_for_ssl: false\n"+
+                        "        acm_certificate_arn: acm_cert\n" +
+                        "        ssl_certificate_file: \"/full/path/to/certfile.crt\"\n" +
+                        "        ssl_key_file: \"/full/path/to/keyfile.key\"\n" +
+                        "        buffer_type: \"in_memory\"\n" +
+                        "        threshold:\n" +
+                        "          event_count: 2000\n" +
+                        "          maximum_size: 2mb\n" +
+                        "        max_retries: 5\n";
+        final HttpSinkConfiguration httpSinkConfiguration = objectMapper.readValue(SINK_YAML, HttpSinkConfiguration.class);
+        httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
+    }
+
+    @Test
+    public void is_valid_aws_url_positive_test() throws JsonProcessingException {
+
+        final String SINK_YAML =
+                "        url: \"https://amazonaws.com/test\"\n";
+        final HttpSinkConfiguration httpSinkConfiguration = objectMapper.readValue(SINK_YAML, HttpSinkConfiguration.class);
+
+        assertTrue(httpSinkConfiguration.isValidAWSUrl());
+    }
+
+    @Test
+    public void is_valid_aws_url_negative_test() throws JsonProcessingException {
+
+        final String SINK_YAML =
+                "        url: \"https://httpbin.org/post\"\n";
+        final HttpSinkConfiguration httpSinkConfiguration = objectMapper.readValue(SINK_YAML, HttpSinkConfiguration.class);
+
+        assertFalse(httpSinkConfiguration.isValidAWSUrl());
     }
 }

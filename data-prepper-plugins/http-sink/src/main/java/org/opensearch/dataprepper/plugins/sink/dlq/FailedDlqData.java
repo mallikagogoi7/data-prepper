@@ -11,7 +11,7 @@ import java.util.List;
 
 public class FailedDlqData {
 
-    private final List<HttpEndPointResponse> endPointResponses;
+    private final HttpEndPointResponse endPointResponses;
     @JsonIgnore
     private final String bufferData;
 
@@ -20,7 +20,7 @@ public class FailedDlqData {
         this.bufferData = builder.bufferData;
     }
 
-    public List<HttpEndPointResponse> getEndPointResponses() {
+    public HttpEndPointResponse getEndPointResponses() {
         return endPointResponses;
     }
 
@@ -41,11 +41,11 @@ public class FailedDlqData {
 
     public static class Builder {
 
-        private List<HttpEndPointResponse> endPointResponses;
+        private HttpEndPointResponse endPointResponses;
 
         private String bufferData;
 
-        public Builder withEndPointResponses(List<HttpEndPointResponse> endPointResponses) {
+        public Builder withEndPointResponses(HttpEndPointResponse endPointResponses) {
             this.endPointResponses = endPointResponses;
             return this;
         }

@@ -75,6 +75,7 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         final PluginModel codecConfiguration = httpSinkConfiguration.getCodec();
         final PluginSetting codecPluginSettings = new PluginSetting(codecConfiguration.getPluginName(),
                 codecConfiguration.getPluginSettings());
+
         codecPluginSettings.setPipelineName(pipelineDescription.getPipelineName());
         this.codec = pluginFactory.loadPlugin(OutputCodec.class, codecPluginSettings);
         this.sinkInitialized = Boolean.FALSE;
@@ -113,7 +114,8 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
                 httpClientBuilder,
                 pluginMetrics,
                 awsCredentialsSupplier,
-                Objects.nonNull(sinkContext) ? sinkContext.getTagsTargetKey() : null);
+                Objects.nonNull(sinkContext) ? sinkContext.getTagsTargetKey() : null,
+                pluginSetting);
     }
 
     @Override

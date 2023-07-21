@@ -2,36 +2,30 @@ log-pipeline:
   source:
     random:
   sink:
+    - stdout:
     - http:
-        urls:
-          - url: http://httpbin
-            http_method: POST
-            auth_type: unauthenticated
-            #proxy: http://localhost:8080
+        url: http://localhost:8080/push
+        http_method: POST
+        auth_type: unauthenticated
         authentication:
           http_basic:
             username: admin
             password: admin
         codec:
           newline:
-        dlq_file : D:/AWS/HttpSink/dlq-11
-        dlq:
-          s3:
-            bucket: "uday.aws4"
-            key_path_prefix: "dlq/"
-        useAcmCertForSSL: true
-        acmCertificateArn: arn:aws:acm:ap-south-1:524239988944:certificate/380a0bdd-2689-42d7-8331-42cca28577a9
-#        ssl: true
-#            ssl_certificate_file: "s3://uday.aws4/certs/httpsink.crt"
-#            ssl_key_file: "s3://uday.aws4/certs/httpsink.key"
-        buffer_type: in_memory
-        #webhook_url: http://localhost:8080/webhook
-        ssl: false
-        ssl_certificate_file: D:/AWS/HttpSink/workspace/spring-https/spring-https/src/main/resources/httpsink.crt
-        ssl_key_file: D:/AWS/HttpSink/workspace/spring-https/spring-https/src/main/resources/httpsink.key
+        custom_header:
+          X-Amzn-SageMaker-Custom-Attributes: test
+          X-Amzn-SageMaker-Target-Model: test
+          X-Amzn-SageMaker-Target-Variant: test
+          X-Amzn-SageMaker-Target-Container-Hostname: test
+          X-Amzn-SageMaker-Inference-Id: test
+          X-Amzn-SageMaker-Enable-Explanations: test
+        ssl: true
+        ssl_certificate_file: s3://httpsink-demo/certs/httpsink.crt
+        ssl_key_file: s3://httpsink-demo/certs/httpsink.key
         aws:
           region: ap-south-1
-          sts_role_arn: arn:aws:iam::524239988944:role/app-test
+          sts_role_arn: arn:aws:iam::1234567890:role/app-test
         threshold:
-          event_count: 10
+          event_count: 5
           event_collect_timeout: PT50S

@@ -33,7 +33,6 @@ import org.opensearch.dataprepper.plugins.sink.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.CustomHeaderOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.configuration.ThresholdOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.UrlConfigurationOption;
 import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.test.helper.ReflectivelySetField;
 
@@ -57,15 +56,9 @@ public class HttpSinkServiceTest {
 
     private ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.USE_PLATFORM_LINE_BREAKS));
 
-    private static final String SINK_YAML = "        urls:\n" +
-            "        - url: \"http://localhost:8080/test\"\n" +
-            "          workers: 1\n" +
-            "          proxy: http://localhost:9090\n" +
-            "          codec:\n" +
-            "            ndjson:\n" +
-            "          http_method: \"POST\"\n" +
-            "          auth_type: \"unauthenticated\"\n" +
-            "        proxy: test-proxy\n" +
+    private static final String SINK_YAML =
+            "        url: \"http://localhost:8080/test\"\n" +
+            "        proxy: \"http://localhost:8080/proxy\"\n" +
             "        codec:\n" +
             "          ndjson:\n" +
             "        http_method: \"POST\"\n" +
@@ -158,7 +151,7 @@ public class HttpSinkServiceTest {
                 httpClientBuilder,
                 pluginMetrics,
                 awsCredentialsSupplier,
-                tagsTargetKey);
+                tagsTargetKey, pluginSetting);
     }
 
     @Test
@@ -193,7 +186,6 @@ public class HttpSinkServiceTest {
     @Test
     void http_sink_service_test_with_single_record_with_basic_authentication() throws NoSuchFieldException, IllegalAccessException {
         lenient().when(httpClientBuilder.setDefaultCredentialsProvider(any(BasicCredentialsProvider.class))).thenReturn(httpClientBuilder);
-        ReflectivelySetField.setField(UrlConfigurationOption.class,httpSinkConfiguration.getUrlConfigurationOptions().get(0),"authType", AuthTypeOptions.HTTP_BASIC);
         final HttpSinkService objectUnderTest = createObjectUnderTest(1,httpSinkConfiguration);
         final Record<Event> eventRecord = new Record<>(JacksonEvent.fromMessage("{\"message\":\"c3f847eb-333a-49c3-a4cd-54715ad1b58a\"}"));
         objectUnderTest.output(List.of(eventRecord));
@@ -206,9 +198,9 @@ public class HttpSinkServiceTest {
         final String authentication = "          bearer_token:\n" +
         "            token: \"test\"" ;
         ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authentication", objectMapper.readValue(authentication, PluginModel.class));
-        ReflectivelySetField.setField(UrlConfigurationOption.class, httpSinkConfiguration.getUrlConfigurationOptions().get(0),"authType", AuthTypeOptions.BEARER_TOKEN);
+      //  ReflectivelySetField.setField(UrlConfigurationOption.class, httpSinkConfiguration.getUrlConfigurationOptions().get(0),"authType", AuthTypeOptions.BEARER_TOKEN);
 
-        ReflectivelySetField.setField(UrlConfigurationOption.class,httpSinkConfiguration.getUrlConfigurationOptions().get(0),"authType", AuthTypeOptions.BEARER_TOKEN);
+       // ReflectivelySetField.setField(UrlConfigurationOption.class,httpSinkConfiguration.getUrlConfigurationOptions().get(0),"authType", AuthTypeOptions.BEARER_TOKEN);
         final HttpSinkService objectUnderTest = createObjectUnderTest(1,httpSinkConfiguration);
         final Record<Event> eventRecord = new Record<>(JacksonEvent.fromMessage("{\"message\":\"c3f847eb-333a-49c3-a4cd-54715ad1b58a\"}"));
         objectUnderTest.output(List.of(eventRecord));
@@ -251,4 +243,5 @@ public class HttpSinkServiceTest {
         objectUnderTest.output(List.of(new Record<>(event)));
         verify(httpSinkRecordsSuccessCounter).increment(1);
     }
+
 }

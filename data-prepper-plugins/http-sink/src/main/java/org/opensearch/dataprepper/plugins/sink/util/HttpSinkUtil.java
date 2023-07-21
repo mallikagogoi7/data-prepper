@@ -29,6 +29,4 @@ public class HttpSinkUtil {
         }
         return targetHost;
     }
-
-
 }
