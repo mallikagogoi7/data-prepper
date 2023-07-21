@@ -63,7 +63,7 @@ public class HttpSinkConfiguration {
     private AuthTypeOptions authType = AuthTypeOptions.UNAUTHENTICATED;
 
     @JsonProperty("authentication")
-    private PluginModel authentication;
+    private AuthenticationOptions authentication;
 
     @JsonProperty("ssl_certificate_file")
     private String sslCertificateFile;
@@ -203,7 +203,7 @@ public class HttpSinkConfiguration {
         return authType;
     }
 
-    public PluginModel getAuthentication() {
+    public AuthenticationOptions getAuthentication() {
         return authentication;
     }
 

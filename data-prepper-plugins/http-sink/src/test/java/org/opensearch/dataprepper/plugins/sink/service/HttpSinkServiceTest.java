@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.codec.OutputCodec;
-import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
@@ -29,6 +28,7 @@ import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
+import org.opensearch.dataprepper.plugins.sink.configuration.AuthenticationOptions;
 import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.configuration.ThresholdOptions;
 import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
@@ -66,7 +66,12 @@ public class HttpSinkServiceTest {
             "            username: \"username\"\n" +
             "            password: \"vip\"\n" +
             "          bearer_token:\n" +
-            "            token: \"test\"\n" +
+            "            client_id: 0oaafr4j79segrYGC5d7\n" +
+            "            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M\n" +
+            "            token_url: https://dev-75050956.okta.com/oauth2/default/v1/token\n" +
+            "            grant_type: client_credentials\n" +
+            "            refresh_token: test\n" +
+            "            scope: httpSink\n"+
             "        ssl: false\n" +
             "        dlq_file: \"/your/local/dlq-file\"\n" +
             "        dlq:\n" +
@@ -193,8 +198,13 @@ public class HttpSinkServiceTest {
     void http_sink_service_test_with_single_record_with_bearer_token() throws NoSuchFieldException, IllegalAccessException, JsonProcessingException {
         lenient().when(httpClientBuilder.setDefaultCredentialsProvider(any(BasicCredentialsProvider.class))).thenReturn(httpClientBuilder);
         final String authentication = "          bearer_token:\n" +
-        "            token: \"test\"" ;
-        ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authentication", objectMapper.readValue(authentication, PluginModel.class));
+                "            client_id: 0oaafr4j79segrYGC5d7\n" +
+                "            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M\n" +
+                "            token_url: https://dev-75050956.okta.com/oauth2/default/v1/token\n" +
+                "            grant_type: client_credentials\n" +
+                "            refresh_token: test\n" +
+                "            scope: httpSink" ;
+        ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authentication", objectMapper.readValue(authentication, AuthenticationOptions.class));
         final HttpSinkService objectUnderTest = createObjectUnderTest(1,httpSinkConfiguration);
         final Record<Event> eventRecord = new Record<>(JacksonEvent.fromMessage("{\"message\":\"c3f847eb-333a-49c3-a4cd-54715ad1b58a\"}"));
         objectUnderTest.output(List.of(eventRecord));

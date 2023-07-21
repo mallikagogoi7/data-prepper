@@ -21,6 +21,7 @@ import org.opensearch.dataprepper.plugins.accumulator.Buffer;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.HttpEndPointResponse;
+import org.opensearch.dataprepper.plugins.sink.OAuthRefreshTokenManager;
 import org.opensearch.dataprepper.plugins.sink.ThresholdValidator;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
@@ -48,6 +49,8 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.opensearch.dataprepper.plugins.sink.handler.BearerTokenAuthHttpSinkHandler.AUTHORIZATION;
+
 /**
  * This service class contains logic for sending data to Http Endpoints
  */
@@ -55,15 +58,8 @@ public class HttpSinkService {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpSinkService.class);
 
-    public static final String USERNAME = "username";
-
-    public static final String PASSWORD = "password";
-
-    public static final String TOKEN = "token";
-
-    public static final String BEARER = "Bearer ";
-
     public static final String HTTP_SINK_RECORDS_SUCCESS_COUNTER = "httpSinkRecordsSuccessPushToEndPoint";
+
     public static final String HTTP_SINK_RECORDS_FAILED_COUNTER = "httpSinkRecordsFailedToPushEndPoint";
 
     private final Collection<EventHandle> bufferedEventHandles;
@@ -92,6 +88,8 @@ public class HttpSinkService {
 
     private final Counter httpSinkRecordsFailedCounter;
 
+    private final OAuthRefreshTokenManager oAuthRefreshTokenManager;
+
     private CertificateProviderFactory certificateProviderFactory;
 
     private WebhookService webhookService;
@@ -101,6 +99,8 @@ public class HttpSinkService {
     private Buffer currentBuffer;
 
     private final PluginSetting httpPluginSetting;
+
+    private MultiAuthHttpSinkHandler multiAuthHttpSinkHandler;
 
     public HttpSinkService(final HttpSinkConfiguration httpSinkConfiguration,
                            final BufferFactory bufferFactory,
@@ -122,6 +122,7 @@ public class HttpSinkService {
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
         this.httpPluginSetting = httpPluginSetting;
+		this.oAuthRefreshTokenManager = new OAuthRefreshTokenManager(httpClientBuilder);
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
             this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
             httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
@@ -211,6 +212,9 @@ public class HttpSinkService {
                 httpAuthOptions.get(httpSinkConfiguration.getUrl()).getClassicHttpRequestBuilder();
         classicHttpRequestBuilder.setEntity(new String(currentBufferData));
         try {
+           if(AuthTypeOptions.BEARER_TOKEN.equals(httpSinkConfiguration.getAuthType()))
+                    refreshTokenIfExpired(classicHttpRequestBuilder.getFirstHeader(AUTHORIZATION).getValue(),httpSinkConfiguration.getUrl());
+
             httpAuthOptions.get(httpSinkConfiguration.getUrl()).getHttpClientBuilder().build()
                     .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
             LOG.info("No of Records successfully pushed to endpoint {}", httpSinkConfiguration.getUrl() +" " + currentBuffer.getEventCount());
@@ -247,16 +251,17 @@ public class HttpSinkService {
      */
     private HttpAuthOptions getAuthHandlerByConfig(final AuthTypeOptions authType,
                                                    final HttpAuthOptions.Builder authOptions){
-        MultiAuthHttpSinkHandler multiAuthHttpSinkHandler = null;
         switch(authType) {
             case HTTP_BASIC:
-                String username = httpSinkConfiguration.getAuthentication().getPluginSettings().get(USERNAME).toString();
-                String password = httpSinkConfiguration.getAuthentication().getPluginSettings().get(PASSWORD).toString();
-                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(username,password,httpClientConnectionManager);
+                multiAuthHttpSinkHandler = new BasicAuthHttpSinkHandler(
+                         httpSinkConfiguration.getAuthentication().getHttpBasic().getUsername(),
+                         httpSinkConfiguration.getAuthentication().getHttpBasic().getPassword(),
+                         httpClientConnectionManager);
                 break;
             case BEARER_TOKEN:
-                String token = httpSinkConfiguration.getAuthentication().getPluginSettings().get(TOKEN).toString();
-                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(BEARER + token,httpClientConnectionManager);
+                multiAuthHttpSinkHandler = new BearerTokenAuthHttpSinkHandler(
+                        httpSinkConfiguration.getAuthentication().getBearerTokenOptions(),
+                        httpClientConnectionManager,oAuthRefreshTokenManager);
                 break;
             case UNAUTHENTICATED:
             default:
@@ -315,7 +320,7 @@ public class HttpSinkService {
      */
     private ClassicRequestBuilder buildRequestByHTTPMethodType(final HTTPMethodOptions httpMethodOptions) {
         final ClassicRequestBuilder classicRequestBuilder;
-        switch(httpMethodOptions){
+        switch (httpMethodOptions) {
             case PUT:
                 classicRequestBuilder = ClassicRequestBuilder.put();
                 break;
@@ -327,5 +332,10 @@ public class HttpSinkService {
         return classicRequestBuilder;
     }
 
-
+    private void refreshTokenIfExpired(final String token,final String url){
+        if(oAuthRefreshTokenManager.isTokenExpired(token)) {
+            httpAuthOptions.get(url).getClassicHttpRequestBuilder()
+                    .setHeader(AUTHORIZATION, oAuthRefreshTokenManager.getRefreshToken(httpSinkConfiguration.getAuthentication().getBearerTokenOptions()));
+        }
+    }
 }

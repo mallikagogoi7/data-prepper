@@ -73,15 +73,10 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
             this.bufferFactory = new InMemoryBufferFactory();
         }
 
-        if(httpSinkConfiguration.getDlqFile() != null)
-            this.dlqPushHandler = new DlqPushHandler(httpSinkConfiguration.getDlqFile(), pluginFactory,
-                    null, null, null, null);
-
-        else if(Objects.nonNull(httpSinkConfiguration.getDlq()))
-            this.dlqPushHandler = new DlqPushHandler(httpSinkConfiguration.getDlqFile(), pluginFactory,
-                    httpSinkConfiguration.getDlq().getPluginSettings().get(BUCKET).toString(), httpSinkConfiguration.getAwsAuthenticationOptions()
-                    .getAwsStsRoleArn(), httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion().toString(),
-                    httpSinkConfiguration.getDlq().getPluginSettings().get(KEY_PATH).toString());
+        this.dlqPushHandler = new DlqPushHandler(httpSinkConfiguration.getDlqFile(), pluginFactory,
+                httpSinkConfiguration.getDlq().getPluginSettings().get(BUCKET).toString(), httpSinkConfiguration.getAwsAuthenticationOptions()
+                .getAwsStsRoleArn(), httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion().toString(),
+                httpSinkConfiguration.getDlq().getPluginSettings().get(KEY_PATH).toString());
 
 
         final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(httpSinkConfiguration.getMaxUploadRetries(),
