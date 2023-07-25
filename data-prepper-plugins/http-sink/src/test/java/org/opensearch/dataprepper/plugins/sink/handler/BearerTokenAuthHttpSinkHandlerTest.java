@@ -21,6 +21,6 @@ public class BearerTokenAuthHttpSinkHandlerTest {
         httpAuthOptionsBuilder.setHttpClientBuilder(HttpClients.custom());
         httpAuthOptionsBuilder.setHttpClientConnectionManager(PoolingHttpClientConnectionManagerBuilder.create().build());
         httpAuthOptionsBuilder.setClassicHttpRequestBuilder(ClassicRequestBuilder.post());
-        Assertions.assertEquals(urlString, new BearerTokenAuthHttpSinkHandler("test", new PoolingHttpClientConnectionManager()).authenticate(httpAuthOptionsBuilder).getUrl());
+        Assertions.assertEquals(urlString, new BearerTokenAuthHttpSinkHandler(null, new PoolingHttpClientConnectionManager(),null).authenticate(httpAuthOptionsBuilder).getUrl());
     }
 }

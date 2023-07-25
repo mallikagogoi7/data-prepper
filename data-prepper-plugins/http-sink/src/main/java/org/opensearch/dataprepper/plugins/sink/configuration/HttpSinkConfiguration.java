@@ -16,6 +16,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class HttpSinkConfiguration {
 
@@ -31,6 +32,11 @@ public class HttpSinkConfiguration {
     static final String SSL_KEY_FILE = "sslKeyFile";
     static final String SSL = "ssl";
     static final String AWS_REGION = "awsRegion";
+
+
+    public static final String STS_REGION = "sts_region";
+
+    public static final String STS_ROLE_ARN = "sts_role_arn";
     static final boolean DEFAULT_USE_ACM_CERT_FOR_SSL = false;
     static final int DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS = 120000;
     public static final String SSL_IS_ENABLED = "%s is enabled";
@@ -259,5 +265,21 @@ public class HttpSinkConfiguration {
             return true;
         }
         return false;
+    }
+
+    public String getDlqStsRoleARN(){
+        return Objects.nonNull(getDlqPluginSetting().get(STS_ROLE_ARN)) ?
+                String.valueOf(getDlqPluginSetting().get(STS_ROLE_ARN)) :
+                awsAuthenticationOptions.getAwsStsRoleArn();
+    }
+
+    public String getDlqStsRegion(){
+        return Objects.nonNull(getDlqPluginSetting().get(STS_REGION)) ?
+                String.valueOf(getDlqPluginSetting().get(STS_REGION)) :
+                awsAuthenticationOptions.getAwsRegion().toString();
+    }
+
+    public  Map<String, Object> getDlqPluginSetting(){
+        return dlq != null ? dlq.getPluginSettings() : Map.of();
     }
 }

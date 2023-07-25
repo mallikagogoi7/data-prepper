@@ -74,10 +74,10 @@ public class HTTPSink extends AbstractSink<Record<Event>> {
         }
 
         this.dlqPushHandler = new DlqPushHandler(httpSinkConfiguration.getDlqFile(), pluginFactory,
-                httpSinkConfiguration.getDlq().getPluginSettings().get(BUCKET).toString(), httpSinkConfiguration.getAwsAuthenticationOptions()
-                .getAwsStsRoleArn(), httpSinkConfiguration.getAwsAuthenticationOptions().getAwsRegion().toString(),
-                httpSinkConfiguration.getDlq().getPluginSettings().get(KEY_PATH).toString());
-
+                String.valueOf(httpSinkConfiguration.getDlqPluginSetting().get(BUCKET)),
+                httpSinkConfiguration.getDlqStsRoleARN()
+                ,httpSinkConfiguration.getDlqStsRegion(),
+                String.valueOf(httpSinkConfiguration.getDlqPluginSetting().get(KEY_PATH)));
 
         final HttpRequestRetryStrategy httpRequestRetryStrategy = new DefaultHttpRequestRetryStrategy(httpSinkConfiguration.getMaxUploadRetries(),
                 TimeValue.of(httpSinkConfiguration.getHttpRetryInterval()));
