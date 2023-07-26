@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -24,10 +25,11 @@ public class FailedHttpResponseInterceptorTest {
 
     private HttpContext httpContext;
 
-    public void test_process() throws IOException {
+    @Test
+    public void test_process(){
         httpResponse = mock(HttpResponse.class);
         failedHttpResponseInterceptor = new FailedHttpResponseInterceptor("http://localhost:8080");
-        when(httpResponse.getCode()).thenReturn(400);
-        failedHttpResponseInterceptor.process(httpResponse, entityDetails, httpContext);
+        when(httpResponse.getCode()).thenReturn(501);
+        assertThrows(IOException.class, () -> failedHttpResponseInterceptor.process(httpResponse, entityDetails, httpContext));
     }
 }

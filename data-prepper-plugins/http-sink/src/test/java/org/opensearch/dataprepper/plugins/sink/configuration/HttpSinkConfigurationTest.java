@@ -42,9 +42,8 @@ public class HttpSinkConfigurationTest {
             "          bearer_token:\n" +
             "            client_id: 0oaafr4j79segrYGC5d7\n" +
             "            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M\n" +
-            "            token_url: https://dev-75050956.okta.com/oauth2/default/v1/token\n" +
+            "            token_url: https://localhost/oauth2/default/v1/token\n" +
             "            grant_type: client_credentials\n" +
-            "            refresh_token: test\n" +
             "            scope: httpSink\n"+
             "        ssl: false\n" +
             "        dlq_file: \"/your/local/dlq-file\"\n" +

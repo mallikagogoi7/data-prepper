@@ -28,9 +28,7 @@ import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
-import org.opensearch.dataprepper.plugins.sink.configuration.AuthenticationOptions;
-import org.opensearch.dataprepper.plugins.sink.configuration.HttpSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.configuration.ThresholdOptions;
+import org.opensearch.dataprepper.plugins.sink.configuration.*;
 import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.test.helper.ReflectivelySetField;
 
@@ -68,9 +66,8 @@ public class HttpSinkServiceTest {
             "          bearer_token:\n" +
             "            client_id: 0oaafr4j79segrYGC5d7\n" +
             "            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M\n" +
-            "            token_url: https://dev-75050956.okta.com/oauth2/default/v1/token\n" +
+            "            token_url: https://localhost/oauth2/default/v1/token\n" +
             "            grant_type: client_credentials\n" +
-            "            refresh_token: test\n" +
             "            scope: httpSink\n"+
             "        ssl: false\n" +
             "        dlq_file: \"/your/local/dlq-file\"\n" +
@@ -114,8 +111,6 @@ public class HttpSinkServiceTest {
     private CloseableHttpClient closeableHttpClient;
 
     private CloseableHttpResponse closeableHttpResponse;
-
-    private String tagsTargetKey;
 
     @BeforeEach
     void setup() throws IOException {
@@ -186,10 +181,16 @@ public class HttpSinkServiceTest {
     }
 
     @Test
-    void http_sink_service_test_with_single_record_with_basic_authentication() throws NoSuchFieldException, IllegalAccessException {
+    void http_sink_service_test_with_single_record_with_basic_authentication() throws NoSuchFieldException, IllegalAccessException, JsonProcessingException {
+
+        final String basicAuthYaml =            "          http_basic:\n" +
+                "            username: \"username\"\n" +
+                "            password: \"vip\"\n" ;
+        ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authentication", objectMapper.readValue(basicAuthYaml, AuthenticationOptions.class));
+        ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authType", AuthTypeOptions.HTTP_BASIC);
+        final Record<Event> eventRecord = new Record<>(JacksonEvent.fromMessage("{\"message\":\"c3f847eb-333a-49c3-a4cd-54715ad1b58a\"}"));
         lenient().when(httpClientBuilder.setDefaultCredentialsProvider(any(BasicCredentialsProvider.class))).thenReturn(httpClientBuilder);
         final HttpSinkService objectUnderTest = createObjectUnderTest(1,httpSinkConfiguration);
-        final Record<Event> eventRecord = new Record<>(JacksonEvent.fromMessage("{\"message\":\"c3f847eb-333a-49c3-a4cd-54715ad1b58a\"}"));
         objectUnderTest.output(List.of(eventRecord));
         verify(httpSinkRecordsSuccessCounter).increment(1);
     }
@@ -200,9 +201,8 @@ public class HttpSinkServiceTest {
         final String authentication = "          bearer_token:\n" +
                 "            client_id: 0oaafr4j79segrYGC5d7\n" +
                 "            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M\n" +
-                "            token_url: https://dev-75050956.okta.com/oauth2/default/v1/token\n" +
+                "            token_url: https://localhost/oauth2/default/v1/token\n" +
                 "            grant_type: client_credentials\n" +
-                "            refresh_token: test\n" +
                 "            scope: httpSink" ;
         ReflectivelySetField.setField(HttpSinkConfiguration.class,httpSinkConfiguration,"authentication", objectMapper.readValue(authentication, AuthenticationOptions.class));
         final HttpSinkService objectUnderTest = createObjectUnderTest(1,httpSinkConfiguration);

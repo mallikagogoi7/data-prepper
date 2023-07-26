@@ -76,13 +76,13 @@ public class HttpSinkTest {
         dlqSetting.put("bucket", "dlq.test");
         dlqSetting.put("key_path_prefix", "\\dlq");
         PluginModel dlq = new PluginModel("s3",dlqSetting);
-        when(awsAuthenticationOptions.getAwsStsRoleArn()).thenReturn("arn:aws:iam::1234567890:role/app-test");
-        when(awsAuthenticationOptions.getAwsRegion()).thenReturn(Region.of("ap-south-1"));
         when(httpSinkConfiguration.getAwsAuthenticationOptions()).thenReturn(awsAuthenticationOptions);
+        when(httpSinkConfiguration.getDlqStsRoleARN()).thenReturn("arn:aws:iam::1234567890:role/app-test");
+        when(httpSinkConfiguration.getDlqStsRegion()).thenReturn("ap-south-1");
         when(httpSinkConfiguration.getDlq()).thenReturn(dlq);
         when(httpSinkConfiguration.getThresholdOptions()).thenReturn(thresholdOptions);
         when(thresholdOptions.getEventCount()).thenReturn(10);
-        //when(httpSinkConfiguration.getDlqFile()).thenReturn("\\dlq");
+        when(httpSinkConfiguration.getDlqFile()).thenReturn("\\dlq");
     }
 
     private HTTPSink createObjectUnderTest() {
@@ -111,11 +111,5 @@ public class HttpSinkTest {
         httpSink.doInitialize();
         Collection<Record<Event>> records = new ArrayList<>();
         httpSink.doOutput(records);
-    }
-
-    @Test
-    void test_http_sink_plugin_isReady_config_fail(){
-        Assertions.assertNotNull(httpSink);
-        httpSink.doInitialize();
     }
 }

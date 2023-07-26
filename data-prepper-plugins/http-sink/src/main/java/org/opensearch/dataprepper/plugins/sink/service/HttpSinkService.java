@@ -21,7 +21,7 @@ import org.opensearch.dataprepper.plugins.accumulator.Buffer;
 import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.HttpEndPointResponse;
-import org.opensearch.dataprepper.plugins.sink.OAuthRefreshTokenManager;
+import org.opensearch.dataprepper.plugins.sink.OAuthAccessTokenManager;
 import org.opensearch.dataprepper.plugins.sink.ThresholdValidator;
 import org.opensearch.dataprepper.plugins.sink.certificate.CertificateProviderFactory;
 import org.opensearch.dataprepper.plugins.sink.certificate.HttpClientSSLConnectionManager;
@@ -88,7 +88,7 @@ public class HttpSinkService {
 
     private final Counter httpSinkRecordsFailedCounter;
 
-    private final OAuthRefreshTokenManager oAuthRefreshTokenManager;
+    private final OAuthAccessTokenManager oAuthRefreshTokenManager;
 
     private CertificateProviderFactory certificateProviderFactory;
 
@@ -122,7 +122,7 @@ public class HttpSinkService {
         this.maxBytes = httpSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = httpSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
         this.httpPluginSetting = httpPluginSetting;
-		this.oAuthRefreshTokenManager = new OAuthRefreshTokenManager(httpClientBuilder);
+		this.oAuthRefreshTokenManager = new OAuthAccessTokenManager(httpClientBuilder);
         if (httpSinkConfiguration.isSsl() || httpSinkConfiguration.useAcmCertForSSL()) {
             this.certificateProviderFactory = new CertificateProviderFactory(httpSinkConfiguration);
             httpSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
@@ -337,7 +337,7 @@ public class HttpSinkService {
     private void refreshTokenIfExpired(final String token,final String url){
         if(oAuthRefreshTokenManager.isTokenExpired(token)) {
             httpAuthOptions.get(url).getClassicHttpRequestBuilder()
-                    .setHeader(AUTHORIZATION, oAuthRefreshTokenManager.getRefreshToken(httpSinkConfiguration.getAuthentication().getBearerTokenOptions()));
+                    .setHeader(AUTHORIZATION, oAuthRefreshTokenManager.getAccessToken(httpSinkConfiguration.getAuthentication().getBearerTokenOptions()));
         }
     }
 }

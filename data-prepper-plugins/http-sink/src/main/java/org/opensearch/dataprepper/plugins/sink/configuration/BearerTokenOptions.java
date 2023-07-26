@@ -21,12 +21,11 @@ public class BearerTokenOptions {
     @NotNull(message = "grant type is mandatory for refresh token")
     private String grantType;
 
-    @JsonProperty("refresh_token")
-    private String refreshToken;
-
     @JsonProperty("scope")
     @NotNull(message = "scope is mandatory for refresh token")
     private String scope;
+
+    private String refreshToken;
 
     public String getScope() {
         return scope;
@@ -52,4 +51,7 @@ public class BearerTokenOptions {
         return tokenURL;
     }
 
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
 }

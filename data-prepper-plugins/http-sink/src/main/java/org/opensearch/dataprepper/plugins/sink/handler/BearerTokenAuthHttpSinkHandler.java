@@ -7,7 +7,7 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
-import org.opensearch.dataprepper.plugins.sink.OAuthRefreshTokenManager;
+import org.opensearch.dataprepper.plugins.sink.OAuthAccessTokenManager;
 import org.opensearch.dataprepper.plugins.sink.configuration.BearerTokenOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +28,11 @@ public class BearerTokenAuthHttpSinkHandler implements MultiAuthHttpSinkHandler 
 
     private final ObjectMapper objectMapper;
 
-    private OAuthRefreshTokenManager oAuthRefreshTokenManager;
+    private OAuthAccessTokenManager oAuthRefreshTokenManager;
 
     public BearerTokenAuthHttpSinkHandler(final BearerTokenOptions bearerTokenOptions,
                                           final HttpClientConnectionManager httpClientConnectionManager,
-                                          final OAuthRefreshTokenManager oAuthRefreshTokenManager){
+                                          final OAuthAccessTokenManager oAuthRefreshTokenManager){
         this.bearerTokenOptions = bearerTokenOptions;
         this.httpClientConnectionManager = httpClientConnectionManager;
         this.objectMapper = new ObjectMapper();
@@ -42,7 +42,7 @@ public class BearerTokenAuthHttpSinkHandler implements MultiAuthHttpSinkHandler 
     @Override
     public HttpAuthOptions authenticate(final HttpAuthOptions.Builder httpAuthOptionsBuilder) {
         httpAuthOptionsBuilder.getClassicHttpRequestBuilder()
-                .addHeader(AUTHORIZATION, oAuthRefreshTokenManager.getRefreshToken(bearerTokenOptions));
+                .addHeader(AUTHORIZATION, oAuthRefreshTokenManager.getAccessToken(bearerTokenOptions));
         httpAuthOptionsBuilder.setHttpClientBuilder(httpAuthOptionsBuilder.build().getHttpClientBuilder()
                 .setConnectionManager(httpClientConnectionManager)
                 .addResponseInterceptorLast(new FailedHttpResponseInterceptor(httpAuthOptionsBuilder.getUrl())));
