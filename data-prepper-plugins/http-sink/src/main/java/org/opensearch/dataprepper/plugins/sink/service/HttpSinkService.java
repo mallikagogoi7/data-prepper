@@ -157,7 +157,7 @@ public class HttpSinkService {
                 if (ThresholdValidator.checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)) {
                     final HttpEndPointResponse failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
                     if (failedHttpEndPointResponses != null) {
-                        logFailedData(failedHttpEndPointResponses, getCurrentBufferData(currentBuffer));
+                        logFailedData(failedHttpEndPointResponses);
                     } else {
                         LOG.info("data pushed to the end point successfully");
                     }
@@ -182,11 +182,13 @@ public class HttpSinkService {
     /**
      * * This method logs Failed Data to DLQ and Webhook
      *  @param endPointResponses HttpEndPointResponses.
-     *  @param currentBufferData Current bufferData.
      */
-    private void logFailedData(final HttpEndPointResponse endPointResponses, final byte[] currentBufferData) {
+    private void logFailedData(final HttpEndPointResponse endPointResponses) {
         FailedDlqData failedDlqData =
-                FailedDlqData.builder().withBufferData(new String(currentBufferData)).withEndPointResponses(endPointResponses).build();
+                FailedDlqData.builder()
+                        .withUrl(endPointResponses.getUrl())
+                        .withMessage(endPointResponses.getErrMessage())
+                        .withStatus(endPointResponses.getStatusCode()).build();
         LOG.info("Failed to push the data. Failed DLQ Data: {}",failedDlqData);
 
         logFailureForDlqObjects(failedDlqData);
