@@ -1,0 +1,51 @@
+otel-plugin-pipeline:
+  source:
+    otel_metrics_source:
+      ssl: false
+      port: 21891
+  processor:
+    - otel_metrics_raw_processor:
+        calculate_histogram_buckets: true
+        calculate_exponential_histogram_buckets: true
+        exponential_histogram_max_allowed_scale: 10
+        flatten_attributes: false
+  sink:
+    - stdout:
+    - prometheus:
+        url: http://localhost:8080/metrics
+        proxy:
+        codec:
+          newline:
+        http_method: "POST"
+        custom_header:
+          X-Amzn-SageMaker-Custom-Attributes: [ "test" ]
+        auth_type: "http_basic"
+        authentication:
+          http_basic:
+            username: "username"
+            password: "password"
+          bearer_token:
+            client_id: 0oaafr4j79segrYGC5d7
+            client_secret: fFel-3FutCXAOndezEsOVlght6D6DR4OIt7G5D1_oJ6w0wNoaYtgU17JdyXmGf0M
+            token_url: https://localhost/oauth2/default/v1/token
+            grant_type: client_credentials
+            scope: httpSink
+        ssl: false
+        ssl_certificate_file: "/full/path/to/certfile.crt"
+        buffer_type: "in_memory"
+        use_acm_cert_for_ssl: false
+        acm_certificate_arn:
+        aws_sigv4: false
+        dlq_file: D:/AWS/HttpSink/dlq-13
+        dlq:
+          s3:
+            bucket: "httpsink-demo"
+            key_path_prefix: "dlq/"
+        webhook_url: http://localhost:8080/webhook
+        aws:
+          region: "us-east-2"
+          sts_role_arn: "arn:aws:iam::1234567890:role/data-prepper-s3source-execution-role"
+        threshold:
+          event_count: 5
+          event_collect_timeout: PT2M
+        max_retries: 5
