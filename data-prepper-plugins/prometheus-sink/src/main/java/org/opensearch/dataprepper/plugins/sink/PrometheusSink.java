@@ -18,7 +18,6 @@ import org.opensearch.dataprepper.model.sink.Sink;
 
 import org.opensearch.dataprepper.plugins.sink.configuration.PrometheusSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.service.PrometheusSinkService;
-import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +32,6 @@ public class PrometheusSink extends AbstractSink<Record<Event>> {
     private static final String BUCKET = "bucket";
     private static final String KEY_PATH = "key_path_prefix";
 
-    private WebhookService webhookService;
-
     private volatile boolean sinkInitialized;
 
     private final PrometheusSinkService prometheusSinkService;
@@ -48,8 +45,7 @@ public class PrometheusSink extends AbstractSink<Record<Event>> {
         super(pluginSetting);
         this.sinkInitialized = Boolean.FALSE;
         this.prometheusSinkService = new PrometheusSinkService(
-                prometheusSinkConfiguration,
-                webhookService);
+                prometheusSinkConfiguration);
     }
 
     @Override

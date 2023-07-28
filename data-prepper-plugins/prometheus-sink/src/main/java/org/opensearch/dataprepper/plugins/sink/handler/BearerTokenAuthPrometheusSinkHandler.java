@@ -6,7 +6,6 @@ package org.opensearch.dataprepper.plugins.sink.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.opensearch.dataprepper.plugins.sink.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.OAuthAccessTokenManager;
 import org.opensearch.dataprepper.plugins.sink.configuration.BearerTokenOptions;
 import org.slf4j.Logger;
