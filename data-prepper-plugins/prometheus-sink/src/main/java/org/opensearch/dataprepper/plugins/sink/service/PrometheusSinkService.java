@@ -4,6 +4,9 @@
  */
 package org.opensearch.dataprepper.plugins.sink.service;
 
+import com.arpnetworking.metrics.prometheus.Remote;
+import com.arpnetworking.metrics.prometheus.Types;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -14,6 +17,7 @@ import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
+import org.opensearch.dataprepper.model.metric.*;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.types.ByteCount;
 
@@ -37,17 +41,18 @@ import org.opensearch.dataprepper.plugins.sink.handler.MultiAuthPrometheusSinkHa
 import org.opensearch.dataprepper.plugins.sink.util.HttpSinkUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
 
 import static org.apache.http.HttpHeaders.AUTHORIZATION;
 
@@ -92,8 +97,6 @@ public class PrometheusSinkService {
 
     private CertificateProviderFactory certificateProviderFactory;
 
-    private WebhookService webhookService;
-
     private HttpClientConnectionManager httpClientConnectionManager;
 
     private Buffer currentBuffer;
@@ -102,11 +105,15 @@ public class PrometheusSinkService {
 
     private MultiAuthPrometheusSinkHandler multiAuthPrometheusSinkHandler;
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final Pattern PREFIX_PATTERN = Pattern.compile("^[^a-zA-Z_:]");
+    private static final Pattern BODY_PATTERN = Pattern.compile("[^a-zA-Z0-9_:]");
+
     public PrometheusSinkService(final PrometheusSinkConfiguration prometheusSinkConfiguration,
                                  final BufferFactory bufferFactory,
                                  final DlqPushHandler dlqPushHandler,
                                  final PluginSetting pluginSetting,
-                                 final WebhookService webhookService,
                                  final HttpClientBuilder httpClientBuilder,
                                  final PluginMetrics pluginMetrics,
                                  final PluginSetting httpPluginSetting){
@@ -115,7 +122,6 @@ public class PrometheusSinkService {
         this.dlqPushHandler = dlqPushHandler;
         this.pluginSetting = pluginSetting;
         this.reentrantLock = new ReentrantLock();
-        this.webhookService = webhookService;
         this.bufferedEventHandles = new LinkedList<>();
         this.httpClientBuilder = httpClientBuilder;
         this.maxEvents = prometheusSinkConfiguration.getThresholdOptions().getEventCount();
@@ -147,7 +153,35 @@ public class PrometheusSinkService {
             records.forEach(record -> {
                 final Event event = record.getData();
                 try {
-                    currentBuffer.writeEvent(event.toJsonString().getBytes());
+                    byte[] bytes = null;
+                    if (event.getMetadata().getEventType().equals("METRIC")) {
+                        Remote.WriteRequest message = null;
+                        if (event instanceof JacksonGauge) {
+                            JacksonGauge jacksonGauge = (JacksonGauge) event;
+                            message = buildRemoteWriteRequest(jacksonGauge.getTime(),
+                                    jacksonGauge.getStartTime(), jacksonGauge.getValue(), jacksonGauge.getAttributes());
+                        } else if (event instanceof JacksonSum) {
+                            JacksonSum jacksonSum = (JacksonSum) event;
+                            message = buildRemoteWriteRequest(jacksonSum.getTime(),
+                                    jacksonSum.getStartTime(), jacksonSum.getValue(), jacksonSum.getAttributes());
+                        } else if (event instanceof JacksonSummary) {
+                            JacksonSummary jacksonSummary = (JacksonSummary) event;
+                            message = buildRemoteWriteRequest(jacksonSummary.getTime(),
+                                    jacksonSummary.getStartTime(), jacksonSummary.getSum(), jacksonSummary.getAttributes());
+                        } else if (event instanceof JacksonHistogram) {
+                            JacksonHistogram jacksonHistogram = (JacksonHistogram) event;
+                            message = buildRemoteWriteRequest(jacksonHistogram.getTime(),
+                                    jacksonHistogram.getStartTime(), jacksonHistogram.getSum(), jacksonHistogram.getAttributes());
+                        } else if (event instanceof JacksonExponentialHistogram) {
+                            JacksonExponentialHistogram jacksonExpHistogram = (JacksonExponentialHistogram) event;
+                            message = buildRemoteWriteRequest(jacksonExpHistogram.getTime(),
+                                    jacksonExpHistogram.getStartTime(), jacksonExpHistogram.getSum(), jacksonExpHistogram.getAttributes());
+                        } else {
+                            LOG.error("No valid Event type found");
+                        }
+                        bytes = Snappy.compress(message.toByteArray());
+                    }
+                    currentBuffer.writeEvent(bytes);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -171,6 +205,76 @@ public class PrometheusSinkService {
         }
     }
 
+    /**
+     * * This method build Remote.WriteRequest
+     *  @param time time
+     *  @param startTime start time
+     *  @param value value
+     *  @param attributeMap attributes
+     */
+    private static Remote.WriteRequest buildRemoteWriteRequest(String time, String startTime,
+                                                               Double value, Map<String, Object> attributeMap) {
+        Remote.WriteRequest.Builder writeRequestBuilder = Remote.WriteRequest.newBuilder();
+
+        Types.TimeSeries.Builder timeSeriesBuilder = Types.TimeSeries.newBuilder();
+
+        List<Types.Label> arrayList = new ArrayList<>();
+
+        prepareLabelList(attributeMap, arrayList);
+
+        Types.Sample.Builder sampleBuilder = Types.Sample.newBuilder();
+        long timeStampVal;
+        if (time != null) {
+            timeStampVal = getTimeStampVal(time);
+        } else {
+            timeStampVal = getTimeStampVal(startTime);
+        }
+
+        // TODO: Delete below line
+        timeStampVal = System.currentTimeMillis();
+
+        sampleBuilder.setValue(value).setTimestamp(timeStampVal);
+        Types.Sample sample = sampleBuilder.build();
+
+        timeSeriesBuilder.addAllLabels(arrayList);
+        timeSeriesBuilder.addAllSamples(Arrays.asList(sample));
+
+        Types.TimeSeries timeSeries = timeSeriesBuilder.build();
+        writeRequestBuilder.addAllTimeseries(Arrays.asList(timeSeries));
+
+        return writeRequestBuilder.build();
+    }
+
+    private static void prepareLabelList(Map<String, Object> hashMap, List<Types.Label> arrayList) {
+        for (Map.Entry<String, Object> entry : hashMap.entrySet()) {
+            String key = sanitizeName(entry.getKey());
+            Object value = entry.getValue();
+            if (entry.getValue() instanceof Map) {
+                Object innerMap = entry.getValue();
+                prepareLabelList(objectMapper.convertValue(innerMap, Map.class), arrayList);
+                continue;
+            }
+            Types.Label.Builder labelBuilder = Types.Label.newBuilder();
+            labelBuilder.setName(key).setValue(value.toString());
+            Types.Label label = labelBuilder.build();
+            arrayList.add(label);
+        }
+    }
+
+    private static String sanitizeName(String name) {
+        return BODY_PATTERN
+                .matcher(PREFIX_PATTERN.matcher(name).replaceFirst("_"))
+                .replaceAll("_");
+    }
+
+    private static long getTimeStampVal(String time) {
+        LocalDateTime localDateTimeParse = LocalDateTime.parse(time,
+                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+        LocalDateTime localDateTime = LocalDateTime.parse(localDateTimeParse.toString());
+        ZonedDateTime zdt = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
+        return zdt.toInstant().toEpochMilli();
+    }
+
     private byte[] getCurrentBufferData(final Buffer currentBuffer) {
         try {
             return currentBuffer.getSinkBufferData();
@@ -192,9 +296,6 @@ public class PrometheusSinkService {
         LOG.info("Failed to push the data. Failed DLQ Data: {}",failedDlqData);
 
         logFailureForDlqObjects(failedDlqData);
-        if(Objects.nonNull(webhookService)){
-            logFailureForWebHook(failedDlqData);
-        }
     }
 
     private void releaseEventHandles(final boolean result) {
@@ -238,13 +339,6 @@ public class PrometheusSinkService {
         dlqPushHandler.perform(httpPluginSetting, failedDlqData);
     }
 
-    /**
-     * * This method push Failed objects to Webhook
-     *  @param failedDlqData FailedDlqData.
-     */
-    private void logFailureForWebHook(final FailedDlqData failedDlqData){
-        webhookService.pushWebhook(failedDlqData);
-    }
 
     /**
      * * This method gets Auth Handler classes based on configuration

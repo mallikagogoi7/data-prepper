@@ -12,14 +12,14 @@ otel-plugin-pipeline:
   sink:
     - stdout:
     - prometheus:
-        url: http://localhost:8080/metrics
+        url: http://localhost:8080/push
         proxy:
         codec:
           newline:
         http_method: "POST"
         custom_header:
           X-Amzn-SageMaker-Custom-Attributes: [ "test" ]
-        auth_type: "http_basic"
+        auth_type: "unauthenticated"
         authentication:
           http_basic:
             username: "username"
@@ -41,7 +41,6 @@ otel-plugin-pipeline:
           s3:
             bucket: "httpsink-demo"
             key_path_prefix: "dlq/"
-        webhook_url: http://localhost:8080/webhook
         aws:
           region: "us-east-2"
           sts_role_arn: "arn:aws:iam::1234567890:role/data-prepper-s3source-execution-role"

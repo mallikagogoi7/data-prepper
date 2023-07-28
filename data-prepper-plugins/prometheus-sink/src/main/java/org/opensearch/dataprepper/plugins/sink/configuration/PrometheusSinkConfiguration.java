@@ -102,9 +102,6 @@ public class PrometheusSinkConfiguration {
     @JsonProperty("dlq_file")
     private String dlqFile;
 
-    @JsonProperty("webhook_url")
-    private String webhookURL;
-
     @JsonProperty("dlq")
     private PluginModel dlq;
 
@@ -155,10 +152,6 @@ public class PrometheusSinkConfiguration {
 
     public boolean useAcmCertForSSL() {
         return useAcmCertForSSL;
-    }
-
-    public String getWebhookURL() {
-        return webhookURL;
     }
 
     public void validateAndInitializeCertAndKeyFileInS3() {

@@ -96,8 +96,6 @@ public class HttpPrometheusServiceTest {
 
     private PluginSetting pluginSetting;
 
-    private WebhookService webhookService;
-
     private HttpClientBuilder httpClientBuilder;
 
     private PluginMetrics pluginMetrics;
@@ -119,7 +117,6 @@ public class HttpPrometheusServiceTest {
         this.prometheusSinkConfiguration = objectMapper.readValue(SINK_YAML,PrometheusSinkConfiguration.class);
         this.dlqPushHandler = mock(DlqPushHandler.class);
         this.pluginSetting = mock(PluginSetting.class);
-        this.webhookService = mock(WebhookService.class);
         this.httpClientBuilder = mock(HttpClientBuilder.class);
         this.awsCredentialsSupplier = mock(AwsCredentialsSupplier.class);
         this.httpSinkRecordsSuccessCounter = mock(Counter.class);
@@ -145,7 +142,6 @@ public class HttpPrometheusServiceTest {
                 bufferFactory,
                 dlqPushHandler,
                 pluginSetting,
-                webhookService,
                 httpClientBuilder,
                 pluginMetrics,
                 pluginSetting);

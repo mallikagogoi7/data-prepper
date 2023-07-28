@@ -64,7 +64,6 @@ public class PrometheusSinkConfigurationTest {
             "          maximum_size: 2mb\n" +
             "        max_retries: 5\n" +
             "        aws_sigv4: true\n" +
-            "        webhook_url: \"http://localhost:8080/webhook\"\n" +
             "        custom_header:\n" +
             "          X-Amzn-SageMaker-Custom-Attributes: [\"test-attribute\"]\n" +
             "          X-Amzn-SageMaker-Target-Model: [\"test-target-model\"]\n" +
@@ -183,7 +182,6 @@ public class PrometheusSinkConfigurationTest {
         assertThat(prometheusSinkConfiguration.getSslKeyFile(),equalTo("/full/path/to/keyfile.key"));
         assertThat(prometheusSinkConfiguration.getWorkers(),equalTo(1));
         assertThat(prometheusSinkConfiguration.getDlqFile(),equalTo("/your/local/dlq-file"));
-        assertThat(prometheusSinkConfiguration.getWebhookURL(),equalTo("http://localhost:8080/webhook"));
 
         final Map<String, List<String>> customHeaderOptions = prometheusSinkConfiguration.getCustomHeaderOptions();
         assertThat(customHeaderOptions.get("X-Amzn-SageMaker-Custom-Attributes"),equalTo(List.of("test-attribute")));

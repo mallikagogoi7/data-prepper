@@ -29,7 +29,6 @@ import org.opensearch.dataprepper.plugins.sink.configuration.PrometheusSinkConfi
 import org.opensearch.dataprepper.plugins.sink.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.plugins.sink.service.PrometheusSinkAwsService;
 import org.opensearch.dataprepper.plugins.sink.service.PrometheusSinkService;
-import org.opensearch.dataprepper.plugins.sink.service.WebhookService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,8 +43,6 @@ public class PrometheusSink extends AbstractSink<Record<Event>> {
 
     private static final String BUCKET = "bucket";
     private static final String KEY_PATH = "key_path_prefix";
-
-    private WebhookService webhookService;
 
     private volatile boolean sinkInitialized;
 
@@ -85,10 +82,6 @@ public class PrometheusSink extends AbstractSink<Record<Event>> {
         final HttpClientBuilder httpClientBuilder = HttpClients.custom()
                 .setRetryStrategy(httpRequestRetryStrategy);
 
-        if(Objects.nonNull(prometheusSinkConfiguration.getWebhookURL()))
-            this.webhookService = new WebhookService(prometheusSinkConfiguration.getWebhookURL(),
-                    httpClientBuilder,pluginMetrics,prometheusSinkConfiguration);
-
         if(prometheusSinkConfiguration.isAwsSigv4() && prometheusSinkConfiguration.isValidAWSUrl()){
             PrometheusSinkAwsService.attachSigV4(prometheusSinkConfiguration, httpClientBuilder, awsCredentialsSupplier);
         }
@@ -97,7 +90,6 @@ public class PrometheusSink extends AbstractSink<Record<Event>> {
                 bufferFactory,
                 dlqPushHandler,
                 codecPluginSettings,
-                webhookService,
                 httpClientBuilder,
                 pluginMetrics,
                 pluginSetting);
