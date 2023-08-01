@@ -24,6 +24,7 @@ dependencies {
     testImplementation testLibs.junit.vintage
     testImplementation 'org.assertj:assertj-core:3.24.2'
     testImplementation testLibs.mockito.inline
+    implementation 'io.grpc:grpc-netty:1.42.0'
 }
 
 jacocoTestCoverageVerification {

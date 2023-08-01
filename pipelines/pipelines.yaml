@@ -12,10 +12,8 @@ otel-plugin-pipeline:
   sink:
     - stdout:
     - prometheus:
-        url: http://localhost:8080/push
+        url: http://localhost:8080/metrics
         proxy:
-        codec:
-          newline:
         http_method: "POST"
         custom_header:
           X-Amzn-SageMaker-Custom-Attributes: [ "test" ]
