@@ -13,7 +13,6 @@ import org.opensearch.dataprepper.aws.api.AwsCredentialsSupplier;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.configuration.PipelineDescription;
-import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.plugin.InvalidPluginConfigurationException;
@@ -25,11 +24,10 @@ import org.opensearch.dataprepper.plugins.accumulator.BufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.accumulator.InMemoryBufferFactory;
 import org.opensearch.dataprepper.plugins.accumulator.LocalFileBufferFactory;
-import org.opensearch.dataprepper.plugins.sink.prometheus.service.PrometheusSinkService;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.PrometheusSinkConfiguration;
 import org.opensearch.dataprepper.plugins.sink.prometheus.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.plugins.sink.prometheus.service.PrometheusSinkAwsService;
-
+import org.opensearch.dataprepper.plugins.sink.prometheus.service.PrometheusSinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

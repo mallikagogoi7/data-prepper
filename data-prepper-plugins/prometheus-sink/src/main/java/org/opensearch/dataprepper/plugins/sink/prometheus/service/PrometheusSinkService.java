@@ -20,7 +20,11 @@ import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.event.Event;
 import org.opensearch.dataprepper.model.event.EventHandle;
-import org.opensearch.dataprepper.model.metric.*;
+import org.opensearch.dataprepper.model.metric.JacksonExponentialHistogram;
+import org.opensearch.dataprepper.model.metric.JacksonGauge;
+import org.opensearch.dataprepper.model.metric.JacksonHistogram;
+import org.opensearch.dataprepper.model.metric.JacksonSum;
+import org.opensearch.dataprepper.model.metric.JacksonSummary;
 import org.opensearch.dataprepper.model.record.Record;
 import org.opensearch.dataprepper.model.types.ByteCount;
 
@@ -51,7 +55,14 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.List;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
@@ -82,12 +93,6 @@ public class PrometheusSinkService {
     private final Lock reentrantLock;
 
     private final HttpClientBuilder httpClientBuilder;
-
-    private final int maxEvents;
-
-    private final ByteCount maxBytes;
-
-    private final long maxCollectionDuration;
 
     private final Counter httpSinkRecordsSuccessCounter;
 
@@ -122,9 +127,6 @@ public class PrometheusSinkService {
         this.reentrantLock = new ReentrantLock();
         this.bufferedEventHandles = new LinkedList<>();
         this.httpClientBuilder = httpClientBuilder;
-        this.maxEvents = prometheusSinkConfiguration.getThresholdOptions().getEventCount();
-        this.maxBytes = prometheusSinkConfiguration.getThresholdOptions().getMaximumSize();
-        this.maxCollectionDuration = prometheusSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
         this.httpPluginSetting = httpPluginSetting;
         this.oAuthAccessTokenManager = new OAuthAccessTokenManager(httpClientBuilder);
         if (prometheusSinkConfiguration.isSsl() || prometheusSinkConfiguration.useAcmCertForSSL()) {
@@ -189,10 +191,12 @@ public class PrometheusSinkService {
                 }
                 if (failedHttpEndPointResponses != null) {
                     logFailedData(failedHttpEndPointResponses);
+                    releaseEventHandles(Boolean.FALSE);
                 } else {
                     LOG.info("data pushed to the end point successfully");
+                    releaseEventHandles(Boolean.TRUE);
                 }
-                releaseEventHandles(Boolean.TRUE);
+
             });
 
         }finally {
@@ -217,7 +221,7 @@ public class PrometheusSinkService {
 
         prepareLabelList(attributeMap, arrayList);
 
-        Types.Sample.Builder sampleBuilder = Types.Sample.newBuilder();
+        Types.Sample.Builder prometheusSampleBuilder = Types.Sample.newBuilder();
         long timeStampVal;
         if (time != null) {
             timeStampVal = getTimeStampVal(time);
@@ -225,11 +229,11 @@ public class PrometheusSinkService {
             timeStampVal = getTimeStampVal(startTime);
         }
 
-        sampleBuilder.setValue(value).setTimestamp(timeStampVal);
-        Types.Sample sample = sampleBuilder.build();
+        prometheusSampleBuilder.setValue(value).setTimestamp(timeStampVal);
+        Types.Sample prometheusSample = prometheusSampleBuilder.build();
 
         timeSeriesBuilder.addAllLabels(arrayList);
-        timeSeriesBuilder.addAllSamples(Arrays.asList(sample));
+        timeSeriesBuilder.addAllSamples(Arrays.asList(prometheusSample));
 
         Types.TimeSeries timeSeries = timeSeriesBuilder.build();
         writeRequestBuilder.addAllTimeseries(Arrays.asList(timeSeries));
@@ -261,7 +265,7 @@ public class PrometheusSinkService {
 
     private static long getTimeStampVal(String time) {
         LocalDateTime localDateTimeParse = LocalDateTime.parse(time,
-                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'"));
         LocalDateTime localDateTime = LocalDateTime.parse(localDateTimeParse.toString());
         ZonedDateTime zdt = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
         return zdt.toInstant().toEpochMilli();
@@ -300,15 +304,13 @@ public class PrometheusSinkService {
 
         final byte[] compressedBufferData = Snappy.compress(currentBufferData);
 
-        String encoding = "snappy";
-        String contentType = "application/x-protobuf";
         HttpEntity entity = new ByteArrayEntity(compressedBufferData,
-                ContentType.create(contentType), encoding);
+                ContentType.create(prometheusSinkConfiguration.getContentType()), prometheusSinkConfiguration.getEncoding());
 
         classicHttpRequestBuilder.setEntity(entity);
-        classicHttpRequestBuilder.addHeader("Content-Encoding", encoding);
-        classicHttpRequestBuilder.addHeader("Content-Type", contentType);
-        classicHttpRequestBuilder.addHeader("X-Prometheus-Remote-Write-Version", "0.1.0");
+        classicHttpRequestBuilder.addHeader("Content-Encoding", prometheusSinkConfiguration.getEncoding());
+        classicHttpRequestBuilder.addHeader("Content-Type", prometheusSinkConfiguration.getContentType());
+        classicHttpRequestBuilder.addHeader("X-Prometheus-Remote-Write-Version", prometheusSinkConfiguration.getRemoteWriteVersion());
 
         try {
             if(AuthTypeOptions.BEARER_TOKEN.equals(prometheusSinkConfiguration.getAuthType()))

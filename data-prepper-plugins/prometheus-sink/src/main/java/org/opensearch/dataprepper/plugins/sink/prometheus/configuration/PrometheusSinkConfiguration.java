@@ -33,12 +33,11 @@ public class PrometheusSinkConfiguration {
     static final String SSL = "ssl";
     static final String AWS_REGION = "awsRegion";
 
-
     public static final String STS_REGION = "sts_region";
 
     public static final String STS_ROLE_ARN = "sts_role_arn";
     static final boolean DEFAULT_USE_ACM_CERT_FOR_SSL = false;
-    static final int DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS = 120000;
+    public static final int DEFAULT_ACM_CERT_ISSUE_TIME_OUT_MILLIS = 120000;
     public static final String SSL_IS_ENABLED = "%s is enabled";
 
     public static final Duration DEFAULT_HTTP_RETRY_INTERVAL = Duration.ofSeconds(30);
@@ -50,6 +49,13 @@ public class PrometheusSinkConfiguration {
     private static final String AWS_HOST_API_AWS = "api.aws";
 
     private static final String AWS_HOST_ON_AWS = "on.aws";
+
+    private static final String DEFAULT_ENCODING = "snappy";
+
+    private static final String DEFAULT_CONTENT_TYPE = "application/x-protobuf";
+
+    private static final String DEFAULT_REMOTE_WRITE_VERSION = "0.1.0";
+
 
     @NotNull
     @JsonProperty("url")
@@ -85,10 +91,6 @@ public class PrometheusSinkConfiguration {
     @JsonProperty("buffer_type")
     private BufferTypeOptions bufferType = BufferTypeOptions.INMEMORY;
 
-    @NotNull
-    @JsonProperty("threshold")
-    private ThresholdOptions thresholdOptions;
-
     @JsonProperty("max_retries")
     private int maxUploadRetries = DEFAULT_UPLOAD_RETRIES;
 
@@ -123,6 +125,14 @@ public class PrometheusSinkConfiguration {
     @JsonProperty("http_retry_interval")
     private Duration httpRetryInterval = DEFAULT_HTTP_RETRY_INTERVAL;
 
+    @JsonProperty("encoding")
+    private String encoding = DEFAULT_ENCODING;
+
+    @JsonProperty("content-type")
+    private String contentType = DEFAULT_CONTENT_TYPE;
+
+    @JsonProperty("remote-write-version")
+    private String remoteWriteVersion = DEFAULT_REMOTE_WRITE_VERSION;
 
     private boolean sslCertAndKeyFileInS3;
 
@@ -224,9 +234,6 @@ public class PrometheusSinkConfiguration {
         return bufferType;
     }
 
-    public ThresholdOptions getThresholdOptions() {
-        return thresholdOptions;
-    }
 
     public int getMaxUploadRetries() {
         return maxUploadRetries;
@@ -274,5 +281,17 @@ public class PrometheusSinkConfiguration {
 
     public  Map<String, Object> getDlqPluginSetting(){
         return dlq != null ? dlq.getPluginSettings() : Map.of();
+    }
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public String getRemoteWriteVersion() {
+        return remoteWriteVersion;
     }
 }

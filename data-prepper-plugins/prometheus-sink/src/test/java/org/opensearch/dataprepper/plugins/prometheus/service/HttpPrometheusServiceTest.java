@@ -31,7 +31,6 @@ import org.opensearch.dataprepper.plugins.sink.prometheus.FailedHttpResponseInte
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.AuthenticationOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.PrometheusSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.ThresholdOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.service.PrometheusSinkService;
 import org.opensearch.dataprepper.plugins.sink.prometheus.dlq.DlqPushHandler;
 import org.opensearch.dataprepper.test.helper.ReflectivelySetField;

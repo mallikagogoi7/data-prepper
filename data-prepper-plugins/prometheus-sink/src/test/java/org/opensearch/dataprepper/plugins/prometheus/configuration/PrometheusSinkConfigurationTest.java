@@ -11,12 +11,10 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
-import org.opensearch.dataprepper.model.types.ByteCount;
 import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.AwsAuthenticationOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.PrometheusSinkConfiguration;
-import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.ThresholdOptions;
 import software.amazon.awssdk.regions.Region;
 
 import java.util.HashMap;
@@ -63,9 +61,6 @@ public class PrometheusSinkConfigurationTest {
             "          sts_role_arn: \"arn:aws:iam::895099425785:role/data-prepper-s3source-execution-role\"\n" +
             "          sts_external_id: \"test-external-id\"\n" +
             "          sts_header_overrides: {\"test\": test }\n" +
-            "        threshold:\n" +
-            "          event_count: 2000\n" +
-            "          maximum_size: 2mb\n" +
             "        max_retries: 5\n" +
             "        aws_sigv4: true\n" +
             "        custom_header:\n" +
@@ -140,11 +135,6 @@ public class PrometheusSinkConfigurationTest {
     }
 
     @Test
-    void get_threshold_options_test() {
-        assertNull(new PrometheusSinkConfiguration().getThresholdOptions());
-    }
-
-    @Test
     void default_max_upload_retries_test() {
         assertThat(new PrometheusSinkConfiguration().getMaxUploadRetries(), equalTo(5));
     }
@@ -202,10 +192,6 @@ public class PrometheusSinkConfigurationTest {
         assertThat(awsAuthenticationOptions.getAwsStsExternalId(),equalTo("test-external-id"));
         assertThat(awsAuthenticationOptions.getAwsStsHeaderOverrides().get("test"),equalTo("test"));
         assertThat(awsAuthenticationOptions.getAwsStsRoleArn(),equalTo("arn:aws:iam::895099425785:role/data-prepper-s3source-execution-role"));
-
-        final ThresholdOptions thresholdOptions = prometheusSinkConfiguration.getThresholdOptions();
-        assertThat(thresholdOptions.getEventCount(),equalTo(2000));
-        assertThat(thresholdOptions.getMaximumSize(),instanceOf(ByteCount.class));
 
         Map<String, Object> pluginSettings = new HashMap<>();
         pluginSettings.put("bucket", "dlq.test");

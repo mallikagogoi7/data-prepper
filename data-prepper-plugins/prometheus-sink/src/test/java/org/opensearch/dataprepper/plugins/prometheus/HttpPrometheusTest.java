@@ -18,7 +18,6 @@ import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.AwsAuthe
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.HTTPMethodOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.PrometheusSinkConfiguration;
 import org.opensearch.dataprepper.plugins.accumulator.BufferTypeOptions;
-import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.ThresholdOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.handler.HttpAuthOptions;
 
 import java.util.ArrayList;

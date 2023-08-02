@@ -42,7 +42,7 @@ otel-plugin-pipeline:
         aws:
           region: "us-east-2"
           sts_role_arn: "arn:aws:iam::1234567890:role/data-prepper-s3source-execution-role"
-        threshold:
-          event_count: 5
-          event_collect_timeout: PT2M
         max_retries: 5
+        encoding: snappy
+        content-type: application/x-protobuf
+        remote-write-version: 0.1.0
