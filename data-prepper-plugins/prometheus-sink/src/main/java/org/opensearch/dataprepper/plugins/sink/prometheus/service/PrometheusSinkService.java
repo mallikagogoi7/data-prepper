@@ -261,7 +261,7 @@ public class PrometheusSinkService {
 
     private static long getTimeStampVal(String time) {
         LocalDateTime localDateTimeParse = LocalDateTime.parse(time,
-                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'"));
+                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
         LocalDateTime localDateTime = LocalDateTime.parse(localDateTimeParse.toString());
         ZonedDateTime zdt = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
         return zdt.toInstant().toEpochMilli();
