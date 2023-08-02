@@ -11,7 +11,10 @@ import io.micrometer.core.instrument.Counter;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
@@ -27,7 +30,6 @@ import org.opensearch.dataprepper.plugins.sink.prometheus.certificate.Certificat
 import org.opensearch.dataprepper.plugins.sink.prometheus.FailedHttpResponseInterceptor;
 import org.opensearch.dataprepper.plugins.sink.prometheus.HttpEndPointResponse;
 import org.opensearch.dataprepper.plugins.sink.prometheus.OAuthAccessTokenManager;
-import org.opensearch.dataprepper.plugins.sink.ThresholdValidator;
 import org.opensearch.dataprepper.plugins.sink.prometheus.certificate.HttpClientSSLConnectionManager;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.AuthTypeOptions;
 import org.opensearch.dataprepper.plugins.sink.prometheus.configuration.HTTPMethodOptions;
@@ -91,7 +93,7 @@ public class PrometheusSinkService {
 
     private final Counter httpSinkRecordsFailedCounter;
 
-    private final OAuthAccessTokenManager oAuthRefreshTokenManager;
+    private final OAuthAccessTokenManager oAuthAccessTokenManager;
 
     private CertificateProviderFactory certificateProviderFactory;
 
@@ -124,7 +126,7 @@ public class PrometheusSinkService {
         this.maxBytes = prometheusSinkConfiguration.getThresholdOptions().getMaximumSize();
         this.maxCollectionDuration = prometheusSinkConfiguration.getThresholdOptions().getEventCollectTimeOut().getSeconds();
         this.httpPluginSetting = httpPluginSetting;
-		this.oAuthRefreshTokenManager = new OAuthAccessTokenManager(httpClientBuilder);
+        this.oAuthAccessTokenManager = new OAuthAccessTokenManager(httpClientBuilder);
         if (prometheusSinkConfiguration.isSsl() || prometheusSinkConfiguration.useAcmCertForSSL()) {
             this.certificateProviderFactory = new CertificateProviderFactory(prometheusSinkConfiguration);
             prometheusSinkConfiguration.validateAndInitializeCertAndKeyFileInS3();
@@ -148,53 +150,50 @@ public class PrometheusSinkService {
         try {
             records.forEach(record -> {
                 final Event event = record.getData();
-                try {
-                    byte[] bytes = null;
-                    if (event.getMetadata().getEventType().equals("METRIC")) {
-                        Remote.WriteRequest message = null;
-                        if (event instanceof JacksonGauge) {
-                            JacksonGauge jacksonGauge = (JacksonGauge) event;
-                            message = buildRemoteWriteRequest(jacksonGauge.getTime(),
-                                    jacksonGauge.getStartTime(), jacksonGauge.getValue(), jacksonGauge.getAttributes());
-                        } else if (event instanceof JacksonSum) {
-                            JacksonSum jacksonSum = (JacksonSum) event;
-                            message = buildRemoteWriteRequest(jacksonSum.getTime(),
-                                    jacksonSum.getStartTime(), jacksonSum.getValue(), jacksonSum.getAttributes());
-                        } else if (event instanceof JacksonSummary) {
-                            JacksonSummary jacksonSummary = (JacksonSummary) event;
-                            message = buildRemoteWriteRequest(jacksonSummary.getTime(),
-                                    jacksonSummary.getStartTime(), jacksonSummary.getSum(), jacksonSummary.getAttributes());
-                        } else if (event instanceof JacksonHistogram) {
-                            JacksonHistogram jacksonHistogram = (JacksonHistogram) event;
-                            message = buildRemoteWriteRequest(jacksonHistogram.getTime(),
-                                    jacksonHistogram.getStartTime(), jacksonHistogram.getSum(), jacksonHistogram.getAttributes());
-                        } else if (event instanceof JacksonExponentialHistogram) {
-                            JacksonExponentialHistogram jacksonExpHistogram = (JacksonExponentialHistogram) event;
-                            message = buildRemoteWriteRequest(jacksonExpHistogram.getTime(),
-                                    jacksonExpHistogram.getStartTime(), jacksonExpHistogram.getSum(), jacksonExpHistogram.getAttributes());
-                        } else {
-                            LOG.error("No valid Event type found");
-                        }
-                        bytes = Snappy.compress(message.toByteArray());
+                byte[] bytes = null;
+                if (event.getMetadata().getEventType().equals("METRIC")) {
+                    Remote.WriteRequest message = null;
+                    if (event instanceof JacksonGauge) {
+                        JacksonGauge jacksonGauge = (JacksonGauge) event;
+                        message = buildRemoteWriteRequest(jacksonGauge.getTime(),
+                                jacksonGauge.getStartTime(), jacksonGauge.getValue(), jacksonGauge.getAttributes());
+                    } else if (event instanceof JacksonSum) {
+                        JacksonSum jacksonSum = (JacksonSum) event;
+                        message = buildRemoteWriteRequest(jacksonSum.getTime(),
+                                jacksonSum.getStartTime(), jacksonSum.getValue(), jacksonSum.getAttributes());
+                    } else if (event instanceof JacksonSummary) {
+                        JacksonSummary jacksonSummary = (JacksonSummary) event;
+                        message = buildRemoteWriteRequest(jacksonSummary.getTime(),
+                                jacksonSummary.getStartTime(), jacksonSummary.getSum(), jacksonSummary.getAttributes());
+                    } else if (event instanceof JacksonHistogram) {
+                        JacksonHistogram jacksonHistogram = (JacksonHistogram) event;
+                        message = buildRemoteWriteRequest(jacksonHistogram.getTime(),
+                                jacksonHistogram.getStartTime(), jacksonHistogram.getSum(), jacksonHistogram.getAttributes());
+                    } else if (event instanceof JacksonExponentialHistogram) {
+                        JacksonExponentialHistogram jacksonExpHistogram = (JacksonExponentialHistogram) event;
+                        message = buildRemoteWriteRequest(jacksonExpHistogram.getTime(),
+                                jacksonExpHistogram.getStartTime(), jacksonExpHistogram.getSum(), jacksonExpHistogram.getAttributes());
+                    } else {
+                        LOG.error("No valid Event type found");
                     }
-                    currentBuffer.writeEvent(bytes);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    bytes = message.toByteArray();
                 }
                 if (event.getEventHandle() != null) {
                     this.bufferedEventHandles.add(event.getEventHandle());
                 }
-                if (ThresholdValidator.checkThresholdExceed(currentBuffer, maxEvents, maxBytes, maxCollectionDuration)) {
-                    final HttpEndPointResponse failedHttpEndPointResponses = pushToEndPoint(getCurrentBufferData(currentBuffer));
-                    if (failedHttpEndPointResponses != null) {
-                        logFailedData(failedHttpEndPointResponses);
-                    } else {
-                        LOG.info("data pushed to the end point successfully");
-                    }
-                    currentBuffer = bufferFactory.getBuffer();
-                    releaseEventHandles(Boolean.TRUE);
-
-                }});
+                HttpEndPointResponse failedHttpEndPointResponses = null;
+                try {
+                    failedHttpEndPointResponses = pushToEndPoint(bytes);
+                } catch (IOException e) {
+                    LOG.info("Error while pushing to the end point");
+                }
+                if (failedHttpEndPointResponses != null) {
+                    logFailedData(failedHttpEndPointResponses);
+                } else {
+                    LOG.info("data pushed to the end point successfully");
+                }
+                releaseEventHandles(Boolean.TRUE);
+            });
 
         }finally {
             reentrantLock.unlock();
@@ -225,9 +224,6 @@ public class PrometheusSinkService {
         } else {
             timeStampVal = getTimeStampVal(startTime);
         }
-
-        // TODO: Delete below line
-        timeStampVal = System.currentTimeMillis();
 
         sampleBuilder.setValue(value).setTimestamp(timeStampVal);
         Types.Sample sample = sampleBuilder.build();
@@ -271,14 +267,6 @@ public class PrometheusSinkService {
         return zdt.toInstant().toEpochMilli();
     }
 
-    private byte[] getCurrentBufferData(final Buffer currentBuffer) {
-        try {
-            return currentBuffer.getSinkBufferData();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     /**
      * * This method logs Failed Data to DLQ and Webhook
      *  @param endPointResponses HttpEndPointResponses.
@@ -305,14 +293,26 @@ public class PrometheusSinkService {
      * * This method pushes bufferData to configured HttpEndPoints
      *  @param currentBufferData bufferData.
      */
-    private HttpEndPointResponse pushToEndPoint(final byte[] currentBufferData) {
+    private HttpEndPointResponse pushToEndPoint(final byte[] currentBufferData) throws IOException {
         HttpEndPointResponse httpEndPointResponses = null;
         final ClassicRequestBuilder classicHttpRequestBuilder =
                 httpAuthOptions.get(prometheusSinkConfiguration.getUrl()).getClassicHttpRequestBuilder();
-        classicHttpRequestBuilder.setEntity(new String(currentBufferData));
+
+        final byte[] compressedBufferData = Snappy.compress(currentBufferData);
+
+        String encoding = "snappy";
+        String contentType = "application/x-protobuf";
+        HttpEntity entity = new ByteArrayEntity(compressedBufferData,
+                ContentType.create(contentType), encoding);
+
+        classicHttpRequestBuilder.setEntity(entity);
+        classicHttpRequestBuilder.addHeader("Content-Encoding", encoding);
+        classicHttpRequestBuilder.addHeader("Content-Type", contentType);
+        classicHttpRequestBuilder.addHeader("X-Prometheus-Remote-Write-Version", "0.1.0");
+
         try {
-           if(AuthTypeOptions.BEARER_TOKEN.equals(prometheusSinkConfiguration.getAuthType()))
-                    refreshTokenIfExpired(classicHttpRequestBuilder.getFirstHeader(AUTHORIZATION).getValue(),prometheusSinkConfiguration.getUrl());
+            if(AuthTypeOptions.BEARER_TOKEN.equals(prometheusSinkConfiguration.getAuthType()))
+                accessTokenIfExpired(classicHttpRequestBuilder.getFirstHeader(AUTHORIZATION).getValue(),prometheusSinkConfiguration.getUrl());
 
             httpAuthOptions.get(prometheusSinkConfiguration.getUrl()).getHttpClientBuilder().build()
                     .execute(classicHttpRequestBuilder.build(), HttpClientContext.create());
@@ -348,12 +348,12 @@ public class PrometheusSinkService {
                 multiAuthPrometheusSinkHandler = new BasicAuthPrometheusSinkHandler(
                         prometheusSinkConfiguration.getAuthentication().getHttpBasic().getUsername(),
                         prometheusSinkConfiguration.getAuthentication().getHttpBasic().getPassword(),
-                         httpClientConnectionManager);
+                        httpClientConnectionManager);
                 break;
             case BEARER_TOKEN:
                 multiAuthPrometheusSinkHandler = new BearerTokenAuthPrometheusSinkHandler(
                         prometheusSinkConfiguration.getAuthentication().getBearerTokenOptions(),
-                        httpClientConnectionManager,oAuthRefreshTokenManager);
+                        httpClientConnectionManager, oAuthAccessTokenManager);
                 break;
             case UNAUTHENTICATED:
             default:
@@ -424,10 +424,10 @@ public class PrometheusSinkService {
         return classicRequestBuilder;
     }
 
-    private void refreshTokenIfExpired(final String token,final String url){
-        if(oAuthRefreshTokenManager.isTokenExpired(token)) {
+    private void accessTokenIfExpired(final String token,final String url){
+        if(oAuthAccessTokenManager.isTokenExpired(token)) {
             httpAuthOptions.get(url).getClassicHttpRequestBuilder()
-                    .setHeader(AUTHORIZATION, oAuthRefreshTokenManager.getAccessToken(prometheusSinkConfiguration.getAuthentication().getBearerTokenOptions()));
+                    .setHeader(AUTHORIZATION, oAuthAccessTokenManager.getAccessToken(prometheusSinkConfiguration.getAuthentication().getBearerTokenOptions()));
         }
     }
 }

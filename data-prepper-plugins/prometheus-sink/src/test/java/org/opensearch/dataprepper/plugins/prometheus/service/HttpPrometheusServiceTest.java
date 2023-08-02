@@ -145,7 +145,6 @@ public class HttpPrometheusServiceTest {
                 httpSinkConfig,
                 bufferFactory,
                 dlqPushHandler,
-                pluginSetting,
                 httpClientBuilder,
                 pluginMetrics,
                 pluginSetting);
